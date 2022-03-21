@@ -113,7 +113,7 @@ def get_cond(mode, selected_path):
         c = Image.open(selected_path)
         c = torch.unsqueeze(torchvision.transforms.ToTensor()(c), 0)
         c_up = torchvision.transforms.functional.resize(c, size=[up_f * c.shape[2], up_f * c.shape[3]], antialias=True)
-        c_up = rearrange(c_up, '1 c h w -> 1 h w c')
+        c_up = rearrange(c_up, '1 c h w -> 1 h w c') * 2 - 1
         c = rearrange(c, '1 c h w -> 1 h w c')
         c = 2. * c - 1.
 
