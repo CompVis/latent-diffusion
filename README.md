@@ -88,7 +88,7 @@ Available via a [notebook](scripts/latent_imagenet_diffusion.ipynb) [![][colab]]
 ![class-conditional](assets/birdhouse.png)
 
 [colab]: <https://colab.research.google.com/assets/colab-badge.svg>
-[colab-cin]: <https://colab.research.google.com/github/CompVis/latent-diffusion/blob/main/scripts/latent-imagenet-diffusion.ipynb>
+[colab-cin]: <https://colab.research.google.com/github/CompVis/latent-diffusion/blob/main/scripts/latent_imagenet_diffusion.ipynb>
 
 
 ## Unconditional Models
