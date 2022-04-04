@@ -118,7 +118,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         with model.ema_scope():
             uc = None
-            if opt.scale > 0:
+            if opt.scale != 1.0:
                 uc = model.get_learned_conditioning(opt.n_samples * [""])
             for n in trange(opt.n_iter, desc="Sampling"):
                 c = model.get_learned_conditioning(opt.n_samples * [prompt])
