@@ -72,6 +72,9 @@ class DDIMSampler(object):
                verbose=True,
                x_T=None,
                log_every_t=100,
+               unconditional_guidance_scale=1.,
+               unconditional_conditioning=None,
+               # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
                **kwargs
                ):
         if conditioning is not None:
@@ -100,7 +103,9 @@ class DDIMSampler(object):
                                                     score_corrector=score_corrector,
                                                     corrector_kwargs=corrector_kwargs,
                                                     x_T=x_T,
-                                                    log_every_t=log_every_t
+                                                    log_every_t=log_every_t,
+                                                    unconditional_guidance_scale=unconditional_guidance_scale,
+                                                    unconditional_conditioning=unconditional_conditioning,
                                                     )
         return samples, intermediates
 
@@ -109,7 +114,8 @@ class DDIMSampler(object):
                       x_T=None, ddim_use_original_steps=False,
                       callback=None, timesteps=None, quantize_denoised=False,
                       mask=None, x0=None, img_callback=None, log_every_t=100,
-                      temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None):
+                      temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
+                      unconditional_guidance_scale=1., unconditional_conditioning=None,):
         device = self.model.betas.device
         b = shape[0]
         if x_T is None:
@@ -142,7 +148,9 @@ class DDIMSampler(object):
             outs = self.p_sample_ddim(img, cond, ts, index=index, use_original_steps=ddim_use_original_steps,
                                       quantize_denoised=quantize_denoised, temperature=temperature,
                                       noise_dropout=noise_dropout, score_corrector=score_corrector,
-                                      corrector_kwargs=corrector_kwargs)
+                                      corrector_kwargs=corrector_kwargs,
+                                      unconditional_guidance_scale=unconditional_guidance_scale,
+                                      unconditional_conditioning=unconditional_conditioning)
             img, pred_x0 = outs
             if callback: callback(i)
             if img_callback: img_callback(pred_x0, i)
@@ -155,9 +163,16 @@ class DDIMSampler(object):
 
     @torch.no_grad()
     def p_sample_ddim(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
-                      temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None):
+                      temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
+                      unconditional_guidance_scale=1., unconditional_conditioning=None):
         b, *_, device = *x.shape, x.device
         e_t = self.model.apply_model(x, t, c)
+
+        if unconditional_guidance_scale > 1.:
+            assert unconditional_conditioning is not None
+            e_t_uncond =  self.model.apply_model(x, t, unconditional_conditioning)
+            e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
+
         if score_corrector is not None:
             assert self.model.parameterization == "eps"
             e_t = score_corrector.modify_score(self.model, e_t, x, t, c, **corrector_kwargs)
