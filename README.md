@@ -57,6 +57,7 @@ Quality, sampling speed and diversity are best controlled via the `scale`, `ddim
 As a rule of thumb, higher values of `scale` produce better samples at the cost of a reduced output diversity.   
 Furthermore, increasing `ddim_steps` generally also gives higher quality samples, but returns are diminishing for values > 250.
 Fast sampling (i.e. low values of `ddim_steps`) while retaining good quality can be achieved by using `--ddim_eta 0.0`.  
+Faster sampling (i.e. even lower values of `ddim_steps`) while retaining good quality can be achieved by using `--ddim_eta 0.0` and `--plms` (see [Pseudo Numerical Methods for Diffusion Models on Manifolds](https://arxiv.org/abs/2202.09778)).
 
 #### Beyond 256²
 
