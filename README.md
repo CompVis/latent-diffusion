@@ -58,6 +58,20 @@ As a rule of thumb, higher values of `scale` produce better samples at the cost 
 Furthermore, increasing `ddim_steps` generally also gives higher quality samples, but returns are diminishing for values > 250.
 Fast sampling (i.e. low values of `ddim_steps`) while retaining good quality can be achieved by using `--ddim_eta 0.0`.  
 
+## Installing on Docker
+
+- Note: depending on CUDA/GPU version, you might have to change the first line in te Dockerfile or change the torch version being installed. 
+- Build the image: `docker build . --tag latent-diffusion`
+- For text-to-image, download the pre-trained weights (5.7GB):
+  ```
+  mkdir -p models/ldm/text2img-large/
+  wget -O models/ldm/text2img-large/model.ckpt https://ommer-lab.com/files/latent-diffusion/nitro/txt2img-f8-large/model.ckpt
+  ```
+- Sample with (Make sure to call in the directory of this repo):
+  ```
+  docker run --name=tmp-diffusion --rm --gpus all -it -v "$(pwd):/opt/ldm" latent-diffusion /opt/ldm/scripts/txt2img.py --prompt "A large blue whale on a freight ship, vector art" --ddim_eta 0.0 --n_samples 4 --n_iter 4 --scale 5.0 --ddim_steps 50
+  ```
+
 #### Beyond 256²
 
 For certain inputs, simply running the model in a convolutional fashion on larger features than it was trained on
