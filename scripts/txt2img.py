@@ -4,13 +4,25 @@ import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm, trange
-from einops import rearrange
+from einops import rearrange, repeat
 from torchvision.utils import make_grid
 
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 
+def preprocess_image(image_path):
+    image = Image.open(image_path)
+    if not image.mode == "RGB":
+        image = image.convert("RGB")
+    image = np.array(image).astype(np.uint8)
+    image = (image/127.5 - 1.0).astype(np.float32)
+    return image
+
+def preprocess_mask(mask_path, h, w):
+    mask = Image.open(mask_path).convert('1')
+    mask_resize = mask.resize((w, h))
+    return np.array(mask_resize).astype(np.float32)
 
 def load_model_from_config(config, ckpt, verbose=False):
     print(f"Loading model from {ckpt}")
@@ -101,6 +113,20 @@ if __name__ == "__main__":
         default=5.0,
         help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
     )
+
+    parser.add_argument(
+        "--image_prompt",
+        type=str,
+        help="image to prompt with, must specify a mask",
+        default=None
+    )
+
+    parser.add_argument(
+        "--mask_prompt",
+        type=str,
+        help="mask to prompt with, must specify image prompt",
+        default=None
+    )
     opt = parser.parse_args()
 
 
@@ -120,6 +146,30 @@ if __name__ == "__main__":
 
     prompt = opt.prompt
 
+    image_prompt = opt.image_prompt
+    mask_prompt = opt.mask_prompt
+
+    # by default not do inpaint
+    x0 = None
+    mask = None
+
+    # inpaint
+    if image_prompt and mask_prompt:
+        print("Using image as x0: " + image_prompt)
+        print("Using mask image: " + mask_prompt)
+        image_prompt_input = preprocess_image(image_prompt)
+        image_prompt_input = rearrange(image_prompt_input, 'h w c -> c h w')
+        image_prompt_input = torch.from_numpy(image_prompt_input)
+        image_prompt_input = image_prompt_input.to(memory_format=torch.contiguous_format).float()
+        image_prompt_input = repeat(image_prompt_input, 'c h w -> b c h w', b=opt.n_samples).to(device)
+        encoder_posterior = model.encode_first_stage(image_prompt_input)
+        x0 = model.get_first_stage_encoding(encoder_posterior).detach()
+        h = opt.H//8
+        w = opt.W//8
+        mask_prompt_input = preprocess_mask(mask_prompt, h, w)
+        mask = torch.tensor(mask_prompt_input)
+        mask = repeat(mask, 'h w -> b h w', b=opt.n_samples).to(device)
+        mask = mask[:, None, ...]
 
     sample_path = os.path.join(outpath, "samples")
     os.makedirs(sample_path, exist_ok=True)
@@ -141,6 +191,8 @@ if __name__ == "__main__":
                                                  verbose=False,
                                                  unconditional_guidance_scale=opt.scale,
                                                  unconditional_conditioning=uc,
+                                                 x0=x0,
+                                                 mask=mask,
                                                  eta=opt.ddim_eta)
 
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
