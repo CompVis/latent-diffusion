@@ -1,0 +1,4 @@
+outputs/
+**/*.pyc
+**/*.egg-info
+**/*.ckpt
