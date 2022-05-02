@@ -1,12 +1,11 @@
-from abc import abstractmethod
-from functools import partial
 import math
-from typing import Iterable
-
 import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+
+from abc import abstractmethod
+from typing import List, Tuple, Union
 
 from ldm.modules.diffusionmodules.util import (
     checkpoint,
@@ -18,6 +17,7 @@ from ldm.modules.diffusionmodules.util import (
     timestep_embedding,
 )
 from ldm.modules.attention import SpatialTransformer
+from omegaconf.listconfig import ListConfig
 
 
 # dummy replace
@@ -442,30 +442,30 @@ class UNetModel(nn.Module):
 
     def __init__(
         self,
-        image_size,
-        in_channels,
-        model_channels,
-        out_channels,
-        num_res_blocks,
-        attention_resolutions,
-        dropout=0,
-        channel_mult=(1, 2, 4, 8),
-        conv_resample=True,
-        dims=2,
-        num_classes=None,
-        use_checkpoint=False,
-        use_fp16=False,
-        num_heads=-1,
-        num_head_channels=-1,
-        num_heads_upsample=-1,
-        use_scale_shift_norm=False,
-        resblock_updown=False,
-        use_new_attention_order=False,
-        use_spatial_transformer=False,    # custom transformer support
-        transformer_depth=1,              # custom transformer support
-        context_dim=None,                 # custom transformer support
-        n_embed=None,                     # custom support for prediction of discrete ids into codebook of first stage vq model
-        legacy=True,
+        image_size: int,
+        in_channels: int,
+        model_channels: int,
+        out_channels: int,
+        num_res_blocks: int,
+        attention_resolutions: List[int],
+        dropout: float = 0,
+        channel_mult: Tuple = (1, 2, 4, 8),
+        conv_resample: bool = True,
+        dims: int = 2,
+        num_classes: int = None,
+        use_checkpoint: bool = False,
+        use_fp16: bool = False,
+        num_heads: int = -1,
+        num_head_channels: int = -1,
+        num_heads_upsample: int = -1,
+        use_scale_shift_norm: bool = False,
+        resblock_updown: bool = False,
+        use_new_attention_order: bool = False,
+        use_spatial_transformer: bool = False,      # custom transformer support
+        transformer_depth: int = 1,                 # custom transformer support
+        context_dim: Union[int, ListConfig] = None, # custom transformer support
+        n_embed: int = None,                        # custom support for prediction of discrete ids into codebook of first stage vq model
+        legacy: bool = True,
     ):
         super().__init__()
         if use_spatial_transformer:
@@ -473,7 +473,6 @@ class UNetModel(nn.Module):
 
         if context_dim is not None:
             assert use_spatial_transformer, 'Fool!! You forgot to use the spatial transformer for your cross-attention conditioning...'
-            from omegaconf.listconfig import ListConfig
             if type(context_dim) == ListConfig:
                 context_dim = list(context_dim)
 
@@ -531,7 +530,7 @@ class UNetModel(nn.Module):
                         ch,
                         time_embed_dim,
                         dropout,
-                        out_channels=mult * model_channels,
+                        out_channels=mult*model_channels,
                         dims=dims,
                         use_checkpoint=use_checkpoint,
                         use_scale_shift_norm=use_scale_shift_norm,
@@ -555,12 +554,17 @@ class UNetModel(nn.Module):
                             num_head_channels=dim_head,
                             use_new_attention_order=use_new_attention_order,
                         ) if not use_spatial_transformer else SpatialTransformer(
-                            ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim
+                            ch,
+                            num_heads,
+                            dim_head,
+                            depth=transformer_depth,
+                            context_dim=context_dim,
                         )
                     )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
                 input_block_chans.append(ch)
+
             if level != len(channel_mult) - 1:
                 out_ch = ch
                 self.input_blocks.append(
@@ -575,9 +579,11 @@ class UNetModel(nn.Module):
                             use_scale_shift_norm=use_scale_shift_norm,
                             down=True,
                         )
-                        if resblock_updown
-                        else Downsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch
+                        if resblock_updown else Downsample(
+                            ch,
+                            conv_resample,
+                            dims=dims,
+                            out_channels=out_ch,
                         )
                     )
                 )
@@ -591,9 +597,11 @@ class UNetModel(nn.Module):
         else:
             num_heads = ch // num_head_channels
             dim_head = num_head_channels
+
         if legacy:
             #num_heads = 1
             dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
+
         self.middle_block = TimestepEmbedSequential(
             ResBlock(
                 ch,
@@ -610,8 +618,12 @@ class UNetModel(nn.Module):
                 num_head_channels=dim_head,
                 use_new_attention_order=use_new_attention_order,
             ) if not use_spatial_transformer else SpatialTransformer(
-                            ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim
-                        ),
+                ch,
+                num_heads,
+                dim_head,
+                depth=transformer_depth,
+                context_dim=context_dim,
+            ),
             ResBlock(
                 ch,
                 time_embed_dim,
@@ -656,7 +668,11 @@ class UNetModel(nn.Module):
                             num_head_channels=dim_head,
                             use_new_attention_order=use_new_attention_order,
                         ) if not use_spatial_transformer else SpatialTransformer(
-                            ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim
+                            ch,
+                            num_heads,
+                            dim_head,
+                            depth=transformer_depth,
+                            context_dim=context_dim,
                         )
                     )
                 if level and i == num_res_blocks:
@@ -672,8 +688,12 @@ class UNetModel(nn.Module):
                             use_scale_shift_norm=use_scale_shift_norm,
                             up=True,
                         )
-                        if resblock_updown
-                        else Upsample(ch, conv_resample, dims=dims, out_channels=out_ch)
+                        if resblock_updown else Upsample(
+                            ch,
+                            conv_resample,
+                            dims=dims,
+                            out_channels=out_ch,
+                        )
                     )
                     ds //= 2
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
