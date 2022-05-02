@@ -8,12 +8,13 @@
 # thanks!
 
 
-import os
 import math
 import torch
 import torch.nn as nn
 import numpy as np
+
 from einops import repeat
+from typing import Literal
 
 from ldm.util import instantiate_from_config
 
@@ -43,12 +44,17 @@ def make_beta_schedule(schedule, n_timestep, linear_start=1e-4, linear_end=2e-2,
     return betas.numpy()
 
 
-def make_ddim_timesteps(ddim_discr_method, num_ddim_timesteps, num_ddpm_timesteps, verbose=True):
+def make_ddim_timesteps(
+    ddim_discr_method: Literal["uniform", "quad"],
+    num_ddim_timesteps: int,
+    num_ddpm_timesteps: int,
+    verbose: bool = True,
+):
     if ddim_discr_method == 'uniform':
         c = num_ddpm_timesteps // num_ddim_timesteps
         ddim_timesteps = np.asarray(list(range(0, num_ddpm_timesteps, c)))
     elif ddim_discr_method == 'quad':
-        ddim_timesteps = ((np.linspace(0, np.sqrt(num_ddpm_timesteps * .8), num_ddim_timesteps)) ** 2).astype(int)
+        ddim_timesteps = ((np.linspace(0, np.sqrt(num_ddpm_timesteps*.8), num_ddim_timesteps))**2).astype(int)
     else:
         raise NotImplementedError(f'There is no ddim discretization method called "{ddim_discr_method}"')
 
@@ -60,7 +66,12 @@ def make_ddim_timesteps(ddim_discr_method, num_ddim_timesteps, num_ddpm_timestep
     return steps_out
 
 
-def make_ddim_sampling_parameters(alphacums, ddim_timesteps, eta, verbose=True):
+def make_ddim_sampling_parameters(
+    alphacums: torch.Tensor,
+    ddim_timesteps: np.ndarray,
+    eta: float,
+    verbose: bool = True
+):
     # select alphas for computing the variance schedule
     alphas = alphacums[ddim_timesteps]
     alphas_prev = np.asarray([alphacums[0]] + alphacums[ddim_timesteps[:-1]].tolist())

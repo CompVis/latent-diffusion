@@ -1,4 +1,5 @@
 import argparse, os, sys, glob
+sys.path.append(os.curdir)
 from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm

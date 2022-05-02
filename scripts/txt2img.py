@@ -1,18 +1,24 @@
-import argparse, os, sys, glob
+import argparse, os
 import torch
 import numpy as np
-from omegaconf import OmegaConf
-from PIL import Image
-from tqdm import tqdm, trange
+
 from einops import rearrange
+from omegaconf import OmegaConf
 from torchvision.utils import make_grid
+from tqdm import trange
+from typing import Dict
+from PIL import Image
 
 from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 
 
-def load_model_from_config(config, ckpt, verbose=False):
+def load_model_from_config(
+    config: Dict,
+    ckpt: str,
+    verbose: bool = False,
+):
     print(f"Loading model from {ckpt}")
     pl_sd = torch.load(ckpt, map_location="cpu")
     sd = pl_sd["state_dict"]
@@ -38,71 +44,53 @@ if __name__ == "__main__":
         type=str,
         nargs="?",
         default="a painting of a virus monster playing guitar",
-        help="the prompt to render"
-    )
-
+        help="the prompt to render")
     parser.add_argument(
         "--outdir",
         type=str,
         nargs="?",
         help="dir to write results to",
-        default="outputs/txt2img-samples"
-    )
+        default="outputs/txt2img-samples")
     parser.add_argument(
         "--ddim_steps",
         type=int,
         default=200,
-        help="number of ddim sampling steps",
-    )
-
+        help="number of ddim sampling steps")
     parser.add_argument(
         "--plms",
         action='store_true',
-        help="use plms sampling",
-    )
-
+        help="use plms sampling")
     parser.add_argument(
         "--ddim_eta",
         type=float,
         default=0.0,
-        help="ddim eta (eta=0.0 corresponds to deterministic sampling",
-    )
+        help="ddim eta (eta=0.0 corresponds to deterministic sampling")
     parser.add_argument(
         "--n_iter",
         type=int,
         default=1,
-        help="sample this often",
-    )
-
+        help="sample this often")
     parser.add_argument(
         "--H",
         type=int,
         default=256,
-        help="image height, in pixel space",
-    )
-
+        help="image height, in pixel space")
     parser.add_argument(
         "--W",
         type=int,
         default=256,
-        help="image width, in pixel space",
-    )
-
+        help="image width, in pixel space")
     parser.add_argument(
         "--n_samples",
         type=int,
         default=4,
-        help="how many samples to produce for the given prompt",
-    )
-
+        help="how many samples to produce for the given prompt")
     parser.add_argument(
         "--scale",
         type=float,
         default=5.0,
-        help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
-    )
+        help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))")
     opt = parser.parse_args()
-
 
     config = OmegaConf.load("configs/latent-diffusion/txt2img-1p4B-eval.yaml")  # TODO: Optionally download from same location as ckpt and chnage this logic
     model = load_model_from_config(config, "models/ldm/text2img-large/model.ckpt")  # TODO: check path
@@ -117,9 +105,7 @@ if __name__ == "__main__":
 
     os.makedirs(opt.outdir, exist_ok=True)
     outpath = opt.outdir
-
     prompt = opt.prompt
-
 
     sample_path = os.path.join(outpath, "samples")
     os.makedirs(sample_path, exist_ok=True)
@@ -134,14 +120,15 @@ if __name__ == "__main__":
             for n in trange(opt.n_iter, desc="Sampling"):
                 c = model.get_learned_conditioning(opt.n_samples * [prompt])
                 shape = [4, opt.H//8, opt.W//8]
-                samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
-                                                 conditioning=c,
-                                                 batch_size=opt.n_samples,
-                                                 shape=shape,
-                                                 verbose=False,
-                                                 unconditional_guidance_scale=opt.scale,
-                                                 unconditional_conditioning=uc,
-                                                 eta=opt.ddim_eta)
+                samples_ddim, _ = sampler.sample(
+                    S=opt.ddim_steps,
+                    conditioning=c,
+                    batch_size=opt.n_samples,
+                    shape=shape,
+                    verbose=False,
+                    unconditional_guidance_scale=opt.scale,
+                    unconditional_conditioning=uc,
+                    eta=opt.ddim_eta)
 
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
