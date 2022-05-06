@@ -1,10 +1,12 @@
 import importlib
-
 import torch
+
 import numpy as np
+import torch.nn as nn
 
 from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
+from typing import Dict
 
 
 def log_txt_as_img(wh, xc, size=10):
@@ -61,14 +63,14 @@ def mean_flat(tensor):
     return tensor.mean(dim=list(range(1, len(tensor.shape))))
 
 
-def count_params(model, verbose=False):
+def count_params(model: nn.Module, verbose: bool = False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
         print(f"{model.__class__.__name__} has {total_params*1.e-6:.2f} M params.")
     return total_params
 
 
-def instantiate_from_config(config):
+def instantiate_from_config(config: Dict):
     if not "target" in config:
         if config == '__is_first_stage__':
             return None

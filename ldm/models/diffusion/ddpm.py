@@ -34,7 +34,7 @@ __conditioning_keys__ = {'concat': 'c_concat',
                          'adm': 'y'}
 
 
-def disabled_train(self, mode=True):
+def disabled_train(self, mode: bool = True):
     """Overwrite model.train with this function to make sure train/eval mode
     does not change anymore."""
     return self
@@ -539,14 +539,14 @@ class LatentDiffusion(DDPM):
         if self.shorten_cond_schedule:
             self.make_cond_schedule()
 
-    def instantiate_first_stage(self, config):
+    def instantiate_first_stage(self, config: Dict):
         model = instantiate_from_config(config)
         self.first_stage_model = model.eval()
         self.first_stage_model.train = disabled_train
         for param in self.first_stage_model.parameters():
             param.requires_grad = False
 
-    def instantiate_cond_stage(self, config):
+    def instantiate_cond_stage(self, config: Dict):
         if not self.cond_stage_trainable:
             if config == "__is_first_stage__":
                 print("Using first stage also as cond stage.")
