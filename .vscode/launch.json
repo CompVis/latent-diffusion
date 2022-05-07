@@ -1,0 +1,66 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "scripts/sample_diffusion.py",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/sample_diffusion.py",
+            "args": [
+                "-r", "models/ldm/celeba256/model.ckpt",
+                "-l", "outputs/diffusion_results",
+                "-n", "10",
+                "-c", "50",
+                "-e", "0.0"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "scripts/inpaint.py",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/inpaint.py",
+            "args": [
+                "--indir",
+                "data/inpainting_examples/",
+                "--outdir",
+                "outputs/inpainting_results"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "scripts/txt2img.py",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/txt2img.py",
+            "args": [
+                "--prompt",
+                "A painting of a nuclear war, Trending on artstation",
+                "--ddim_eta",
+                "0",
+                "--plms",
+                "--n_samples",
+                "4",
+                "--n_iter",
+                "2",
+                "--scale",
+                "5.0",
+                "--ddim_steps",
+                "50",
+                "--H",
+                "256",
+                "--W",
+                "256"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

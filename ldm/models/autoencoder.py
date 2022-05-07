@@ -9,27 +9,29 @@ from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 from ldm.util import instantiate_from_config
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 from torch import Tensor
-from typing import Dict, List
+from typing import Dict, List, Any, Tuple
 
 
 class VQModel(pl.LightningModule):
-    def __init__(self,
-                 ddconfig,
-                 lossconfig,
-                 n_embed,
-                 embed_dim,
-                 ckpt_path=None,
-                 ignore_keys=[],
-                 image_key="image",
-                 colorize_nlabels=None,
-                 monitor=None,
-                 batch_resize_range=None,
-                 scheduler_config=None,
-                 lr_g_factor=1.0,
-                 remap=None,
-                 sane_index_shape=False, # tell vector quantizer to return indices as bhw
-                 use_ema=False
-                 ):
+
+    def __init__(
+        self,
+        ddconfig: Dict,
+        lossconfig: Dict,
+        n_embed: int,
+        embed_dim: int,
+        ckpt_path: str = None,
+        ignore_keys: List = [],
+        image_key: str = "image",
+        colorize_nlabels: int = None,
+        monitor: Any = None,
+        batch_resize_range: Tuple = None,
+        scheduler_config: Dict = None,
+        lr_g_factor: float = 1.0,
+        remap: str = None,
+        sane_index_shape: bool = False, # tell vector quantizer to return indices as bhw
+        use_ema: bool = False
+    ):
         super().__init__()
         self.embed_dim = embed_dim
         self.n_embed = n_embed
@@ -37,16 +39,22 @@ class VQModel(pl.LightningModule):
         self.encoder = Encoder(**ddconfig)
         self.decoder = Decoder(**ddconfig)
         self.loss = instantiate_from_config(lossconfig)
-        self.quantize = VectorQuantizer(n_embed, embed_dim, beta=0.25,
-                                        remap=remap,
-                                        sane_index_shape=sane_index_shape)
+        self.quantize = VectorQuantizer(
+            n_embed,
+            embed_dim,
+            beta=0.25,
+            remap=remap,
+            sane_index_shape=sane_index_shape)
         self.quant_conv = torch.nn.Conv2d(ddconfig["z_channels"], embed_dim, 1)
         self.post_quant_conv = torch.nn.Conv2d(embed_dim, ddconfig["z_channels"], 1)
+
         if colorize_nlabels is not None:
-            assert type(colorize_nlabels)==int
+            assert type(colorize_nlabels) == int
             self.register_buffer("colorize", torch.randn(3, colorize_nlabels, 1, 1))
+
         if monitor is not None:
             self.monitor = monitor
+
         self.batch_resize_range = batch_resize_range
         if self.batch_resize_range is not None:
             print(f"{self.__class__.__name__}: Using per-batch resizing in range {batch_resize_range}.")
@@ -58,6 +66,7 @@ class VQModel(pl.LightningModule):
 
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+
         self.scheduler_config = scheduler_config
         self.lr_g_factor = lr_g_factor
 
@@ -263,16 +272,17 @@ class VQModel(pl.LightningModule):
 
 
 class VQModelInterface(VQModel):
-    def __init__(self, embed_dim, *args, **kwargs):
+
+    def __init__(self, embed_dim: int, *args, **kwargs):
         super().__init__(embed_dim=embed_dim, *args, **kwargs)
         self.embed_dim = embed_dim
 
-    def encode(self, x):
+    def encode(self, x: Tensor):
         h = self.encoder(x)
         h = self.quant_conv(h)
         return h
 
-    def decode(self, h, force_not_quantize=False):
+    def decode(self, h: Tensor, force_not_quantize: bool = False):
         # also go through quantization layer
         if not force_not_quantize:
             quant, emb_loss, info = self.quantize(h)
