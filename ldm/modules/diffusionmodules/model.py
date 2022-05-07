@@ -43,17 +43,19 @@ def Normalize(in_channels, num_groups=32):
 
 
 class Upsample(nn.Module):
-    def __init__(self, in_channels, with_conv):
+
+    def __init__(self, in_channels: int, with_conv: bool):
         super().__init__()
         self.with_conv = with_conv
         if self.with_conv:
-            self.conv = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+            self.conv = torch.nn.Conv2d(
+                in_channels,
+                in_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1)
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         x = torch.nn.functional.interpolate(x, scale_factor=2.0, mode="nearest")
         if self.with_conv:
             x = self.conv(x)

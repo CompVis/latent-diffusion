@@ -7,7 +7,7 @@ from einops import rearrange, repeat, reduce
 from functools import partial
 from inspect import isfunction
 from torch import nn, einsum, Tensor
-from typing import Tuple, Dict, Callable
+from typing import Tuple, Dict, Callable, Any
 
 # constants
 
@@ -55,35 +55,35 @@ class FixedPositionalEmbedding(nn.Module):
 
 # helpers
 
-def exists(val):
+def exists(val: Any):
     return val is not None
 
 
-def default(val, d):
+def default(val: Any, d: Any):
     if exists(val):
         return val
     return d() if isfunction(d) else d
 
 
-def always(val):
+def always(val: Any):
     def inner(*args, **kwargs):
         return val
     return inner
 
 
-def not_equals(val):
+def not_equals(val: Any):
     def inner(x):
         return x != val
     return inner
 
 
-def equals(val):
+def equals(val: Any):
     def inner(x):
         return x == val
     return inner
 
 
-def max_neg_value(tensor):
+def max_neg_value(tensor: Tensor):
     return -torch.finfo(tensor.dtype).max
 
 
@@ -168,16 +168,18 @@ class RMSNorm(nn.Module):
 
 
 class Residual(nn.Module):
-    def forward(self, x, residual):
+
+    def forward(self, x: Tensor, residual: Tensor):
         return x + residual
 
 
 class GRUGating(nn.Module):
-    def __init__(self, dim):
+
+    def __init__(self, dim: int):
         super().__init__()
         self.gru = nn.GRUCell(dim, dim)
 
-    def forward(self, x, residual):
+    def forward(self, x: Tensor, residual: Tensor):
         gated_output = self.gru(
             rearrange(x, 'b n d -> (b n) d'),
             rearrange(residual, 'b n d -> (b n) d')
@@ -497,13 +499,13 @@ class AttentionLayers(nn.Module):
             ]))
 
     def forward(
-            self,
-            x,
-            context=None,
-            mask=None,
-            context_mask=None,
-            mems=None,
-            return_hiddens=False
+        self,
+        x: Tensor,
+        context: Tensor = None,
+        mask: Tensor = None,
+        context_mask: Tensor = None,
+        mems: Tensor = None,
+        return_hiddens: bool = False
     ):
         hiddens = []
         intermediates = []
@@ -525,10 +527,20 @@ class AttentionLayers(nn.Module):
                 x = norm(x)
 
             if layer_type == 'a':
-                out, inter = block(x, mask=mask, sinusoidal_emb=self.pia_pos_emb, rel_pos=self.rel_pos,
-                                   prev_attn=prev_attn, mem=layer_mem)
+                out, inter = block(
+                    x,
+                    mask=mask,
+                    sinusoidal_emb=self.pia_pos_emb,
+                    rel_pos=self.rel_pos,
+                    prev_attn=prev_attn,
+                    mem=layer_mem)
             elif layer_type == 'c':
-                out, inter = block(x, context=context, mask=mask, context_mask=context_mask, prev_attn=prev_cross_attn)
+                out, inter = block(
+                    x,
+                    context=context,
+                    mask=mask,
+                    context_mask=context_mask,
+                    prev_attn=prev_cross_attn)
             elif layer_type == 'f':
                 out = block(x)
 
@@ -616,14 +628,14 @@ class TransformerWrapper(nn.Module):
         nn.init.normal_(self.token_emb.weight, std=0.02)
 
     def forward(
-            self,
-            x,
-            return_embeddings=False,
-            mask=None,
-            return_mems=False,
-            return_attn=False,
-            mems=None,
-            **kwargs
+        self,
+        x: Tensor,
+        return_embeddings: bool = False,
+        mask: Tensor = None,
+        return_mems: bool = False,
+        return_attn: bool = False,
+        mems: Tensor = None,
+        **kwargs
     ):
         b, n, device, num_mem = *x.shape, x.device, self.num_memory_tokens
         x = self.token_emb(x)

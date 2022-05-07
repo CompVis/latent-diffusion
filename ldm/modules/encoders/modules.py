@@ -6,6 +6,7 @@ from ldm.modules.x_transformer import Encoder, TransformerWrapper  # TODO: can w
 
 
 class AbstractEncoder(nn.Module):
+
     def __init__(self):
         super().__init__()
 
@@ -15,6 +16,7 @@ class AbstractEncoder(nn.Module):
 
 
 class ClassEmbedder(nn.Module):
+
     def __init__(self, embed_dim, n_classes=1000, key='class'):
         super().__init__()
         self.key = key
@@ -30,6 +32,7 @@ class ClassEmbedder(nn.Module):
 
 
 class TransformerEmbedder(AbstractEncoder):
+
     """Some transformer encoder layers"""
     def __init__(self, n_embed, n_layer, vocab_size, max_seq_len=77, device="cuda"):
         super().__init__()
@@ -87,6 +90,7 @@ class BERTTokenizer(AbstractEncoder):
 
 class BERTEmbedder(AbstractEncoder):
     """Uses the BERT tokenizr model and add some transformer encoder layers"""
+
     def __init__(
         self,
         n_embed: int,
@@ -100,7 +104,9 @@ class BERTEmbedder(AbstractEncoder):
         super().__init__()
         self.use_tknz_fn = use_tokenizer
         if self.use_tknz_fn:
-            self.tknz_fn = BERTTokenizer(vq_interface=False, max_length=max_seq_len)
+            self.tknz_fn = BERTTokenizer(
+                vq_interface=False,
+                max_length=max_seq_len)
         self.device = device
         self.transformer = TransformerWrapper(
             num_tokens=vocab_size,
@@ -122,6 +128,7 @@ class BERTEmbedder(AbstractEncoder):
 
 
 class SpatialRescaler(nn.Module):
+
     def __init__(self,
                  n_stages=1,
                  method='bilinear',

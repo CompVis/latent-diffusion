@@ -8,6 +8,7 @@ from ldm.modules.diffusionmodules.model import Encoder, Decoder
 from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 from ldm.util import instantiate_from_config
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
+from torch import Tensor
 from typing import Dict, List
 
 
@@ -329,7 +330,7 @@ class AutoencoderKL(pl.LightningModule):
         posterior = DiagonalGaussianDistribution(moments)
         return posterior
 
-    def decode(self, z):
+    def decode(self, z: Tensor):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)
         return dec

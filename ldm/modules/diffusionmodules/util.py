@@ -10,10 +10,12 @@
 
 import math
 import torch
+
 import torch.nn as nn
 import numpy as np
 
 from einops import repeat
+from torch import device, Size
 from typing import Literal
 
 from ldm.util import instantiate_from_config
@@ -273,7 +275,7 @@ class HybridConditioner(nn.Module):
         return {'c_concat': [c_concat], 'c_crossattn': [c_crossattn]}
 
 
-def noise_like(shape, device, repeat=False):
+def noise_like(shape: Size, device: device, repeat: bool = False):
     repeat_noise = lambda: torch.randn((1, *shape[1:]), device=device).repeat(shape[0], *((1,) * (len(shape) - 1)))
     noise = lambda: torch.randn(shape, device=device)
     return repeat_noise() if repeat else noise()

@@ -444,6 +444,7 @@ class DDPM(pl.LightningModule):
 
 
 class LatentDiffusion(DDPM):
+
     """main class"""
     def __init__(
         self,
@@ -588,7 +589,7 @@ class LatentDiffusion(DDPM):
             raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c):
+    def get_learned_conditioning(self, c: List[str]):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
                 c = self.cond_stage_model.encode(c)
@@ -743,7 +744,12 @@ class LatentDiffusion(DDPM):
         return out
 
     @torch.no_grad()
-    def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
+    def decode_first_stage(
+        self,
+        z: Tensor,
+        predict_cids: bool = False,
+        force_not_quantize: bool = False,
+    ):
         if predict_cids:
             if z.dim() == 4:
                 z = torch.argmax(z.exp(), dim=1).long()
@@ -774,13 +780,12 @@ class LatentDiffusion(DDPM):
 
                 # 2. apply model loop over last dim
                 if isinstance(self.first_stage_model, VQModelInterface):
-                    output_list = [self.first_stage_model.decode(z[:, :, :, :, i],
-                                                                 force_not_quantize=predict_cids or force_not_quantize)
-                                   for i in range(z.shape[-1])]
+                    output_list = [
+                        self.first_stage_model.decode(z[:, :, :, :, i],
+                        force_not_quantize=predict_cids or force_not_quantize) for i in range(z.shape[-1])]
                 else:
-
-                    output_list = [self.first_stage_model.decode(z[:, :, :, :, i])
-                                   for i in range(z.shape[-1])]
+                    output_list = [
+                        self.first_stage_model.decode(z[:, :, :, :, i]) for i in range(z.shape[-1])]
 
                 o = torch.stack(output_list, axis=-1)  # # (bn, nc, ks[0], ks[1], L)
                 o = o * weighting
@@ -795,7 +800,6 @@ class LatentDiffusion(DDPM):
                     return self.first_stage_model.decode(z, force_not_quantize=predict_cids or force_not_quantize)
                 else:
                     return self.first_stage_model.decode(z)
-
         else:
             if isinstance(self.first_stage_model, VQModelInterface):
                 return self.first_stage_model.decode(z, force_not_quantize=predict_cids or force_not_quantize)
@@ -928,8 +932,13 @@ class LatentDiffusion(DDPM):
 
         return [rescale_bbox(b) for b in bboxes]
 
-    def apply_model(self, x_noisy, t, cond, return_ids=False):
-
+    def apply_model(
+        self,
+        x_noisy: Tensor,
+        t: Tensor,
+        cond: Tensor,
+        return_ids: bool = False,
+    ):
         if isinstance(cond, dict):
             # hybrid case, cond is exptected to be a dict
             pass
@@ -937,7 +946,7 @@ class LatentDiffusion(DDPM):
             if not isinstance(cond, list):
                 cond = [cond]
             key = 'c_concat' if self.model.conditioning_key == 'concat' else 'c_crossattn'
-            cond = {key: cond}
+            cond = { key: cond }
 
         if hasattr(self, "split_input_params"):
             assert len(cond) == 1  # todo can only deal with one conditioning atm
@@ -954,18 +963,14 @@ class LatentDiffusion(DDPM):
             z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
             z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
 
-            if self.cond_stage_key in ["image", "LR_image", "segmentation",
-                                       'bbox_img'] and self.model.conditioning_key:  # todo check for completeness
+            if self.cond_stage_key in ["image", "LR_image", "segmentation", "bbox_img"] and self.model.conditioning_key:
                 c_key = next(iter(cond.keys()))  # get key
                 c = next(iter(cond.values()))  # get value
                 assert (len(c) == 1)  # todo extend to list with more than one elem
                 c = c[0]  # get element
-
                 c = unfold(c)
                 c = c.view((c.shape[0], -1, ks[0], ks[1], c.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-
                 cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])]
-
             elif self.cond_stage_key == 'coordinates_bbox':
                 assert 'original_image_size' in self.split_input_params, 'BoudingBoxRescaling is missing original_image_size'
 
@@ -979,19 +984,22 @@ class LatentDiffusion(DDPM):
 
                 # get top left postions of patches as conforming for the bbbox tokenizer, therefore we
                 # need to rescale the tl patch coordinates to be in between (0,1)
-                tl_patch_coordinates = [(rescale_latent * stride[0] * (patch_nr % n_patches_per_row) / full_img_w,
-                                         rescale_latent * stride[1] * (patch_nr // n_patches_per_row) / full_img_h)
-                                        for patch_nr in range(z.shape[-1])]
+                tl_patch_coordinates = [(
+                    rescale_latent * stride[0] * (patch_nr % n_patches_per_row) / full_img_w,
+                    rescale_latent * stride[1] * (patch_nr // n_patches_per_row) / full_img_h,
+                ) for patch_nr in range(z.shape[-1])]
 
                 # patch_limits are tl_coord, width and height coordinates as (x_tl, y_tl, h, w)
-                patch_limits = [(x_tl, y_tl,
-                                 rescale_latent * ks[0] / full_img_w,
-                                 rescale_latent * ks[1] / full_img_h) for x_tl, y_tl in tl_patch_coordinates]
-                # patch_values = [(np.arange(x_tl,min(x_tl+ks, 1.)),np.arange(y_tl,min(y_tl+ks, 1.))) for x_tl, y_tl in tl_patch_coordinates]
+                patch_limits = [(
+                    x_tl, y_tl,
+                    rescale_latent * ks[0] / full_img_w,
+                    rescale_latent * ks[1] / full_img_h,
+                ) for x_tl, y_tl in tl_patch_coordinates]
 
                 # tokenize crop coordinates for the bounding boxes of the respective patches
-                patch_limits_tknzd = [torch.LongTensor(self.bbox_tokenizer._crop_encoder(bbox))[None].to(self.device)
-                                      for bbox in patch_limits]  # list of length l with tensors of shape (1, 2)
+                patch_limits_tknzd = [
+                    torch.LongTensor(self.bbox_tokenizer._crop_encoder(bbox))[None].to(self.device) for bbox in patch_limits
+                ]  # list of length l with tensors of shape (1, 2)
                 print(patch_limits_tknzd[0].shape)
                 # cut tknzd crop position from conditioning
                 assert isinstance(cond, dict), 'cond must be dict to be fed into model'
@@ -1007,14 +1015,12 @@ class LatentDiffusion(DDPM):
                 print(adapted_cond.shape)
 
                 cond_list = [{'c_crossattn': [e]} for e in adapted_cond]
-
             else:
                 cond_list = [cond for i in range(z.shape[-1])]  # Todo make this more efficient
 
             # apply model by loop over crops
             output_list = [self.model(z_list[i], t, **cond_list[i]) for i in range(z.shape[-1])]
-            assert not isinstance(output_list[0],
-                                  tuple)  # todo cant deal with multiple model outputs check this never happens
+            assert not isinstance(output_list[0], tuple)  # todo cant deal with multiple model outputs check this never happens
 
             o = torch.stack(output_list, axis=-1)
             o = o * weighting
