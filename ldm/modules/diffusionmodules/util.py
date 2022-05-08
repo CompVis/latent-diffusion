@@ -15,8 +15,8 @@ import torch.nn as nn
 import numpy as np
 
 from einops import repeat
-from torch import device, Size
-from typing import Literal
+from torch import device, Size, Tensor
+from typing import Literal, Tuple, Callable, Generator, Any
 
 from ldm.util import instantiate_from_config
 
@@ -113,14 +113,14 @@ def extract_into_tensor(a, t, x_shape):
     return out.reshape(b, *((1,) * (len(x_shape) - 1)))
 
 
-def checkpoint(func, inputs, params, flag):
+def checkpoint(func: Callable, inputs: Tuple, params: Generator, flag: bool):
     """
     Evaluate a function without caching intermediate activations, allowing for
     reduced memory at the expense of extra compute in the backward pass.
     :param func: the function to evaluate.
     :param inputs: the argument sequence to pass to `func`.
     :param params: a sequence of parameters `func` depends on but does not
-                   explicitly take as arguments.
+        explicitly take as arguments.
     :param flag: if False, disable gradient checkpointing.
     """
     if flag:
@@ -131,8 +131,9 @@ def checkpoint(func, inputs, params, flag):
 
 
 class CheckpointFunction(torch.autograd.Function):
+
     @staticmethod
-    def forward(ctx, run_function, length, *args):
+    def forward(ctx: Any, run_function: Callable, length: int, *args):
         ctx.run_function = run_function
         ctx.input_tensors = list(args[:length])
         ctx.input_params = list(args[length:])
@@ -162,7 +163,12 @@ class CheckpointFunction(torch.autograd.Function):
         return (None, None) + input_grads
 
 
-def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
+def timestep_embedding(
+    timesteps: Tensor,
+    dim: int,
+    max_period: int = 10000,
+    repeat_only: bool = False
+):
     """
     Create sinusoidal timestep embeddings.
     :param timesteps: a 1-D Tensor of N indices, one per batch element.
