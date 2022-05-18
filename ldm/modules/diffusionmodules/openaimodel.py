@@ -253,26 +253,27 @@ class ResBlock(TimestepBlock):
 
 
     def _forward(self, x, emb):
-        if self.updown:
-            in_rest, in_conv = self.in_layers[:-1], self.in_layers[-1]
-            h = in_rest(x)
-            h = self.h_upd(h)
-            x = self.x_upd(x)
-            h = in_conv(h)
-        else:
-            h = self.in_layers(x)
-        emb_out = self.emb_layers(emb).type(h.dtype)
-        while len(emb_out.shape) < len(h.shape):
-            emb_out = emb_out[..., None]
-        if self.use_scale_shift_norm:
-            out_norm, out_rest = self.out_layers[0], self.out_layers[1:]
-            scale, shift = th.chunk(emb_out, 2, dim=1)
-            h = out_norm(h) * (1 + scale) + shift
-            h = out_rest(h)
-        else:
-            h = h + emb_out
-            h = self.out_layers(h)
-        return self.skip_connection(x) + h
+        with th.cuda.amp.autocast():
+            if self.updown:
+                in_rest, in_conv = self.in_layers[:-1], self.in_layers[-1]
+                h = in_rest(x)
+                h = self.h_upd(h)
+                x = self.x_upd(x)
+                h = in_conv(h)
+            else:
+                h = self.in_layers(x)
+            emb_out = self.emb_layers(emb).type(h.dtype)
+            while len(emb_out.shape) < len(h.shape):
+                emb_out = emb_out[..., None]
+            if self.use_scale_shift_norm:
+                out_norm, out_rest = self.out_layers[0], self.out_layers[1:]
+                scale, shift = th.chunk(emb_out, 2, dim=1)
+                h = out_norm(h) * (1 + scale) + shift
+                h = out_rest(h)
+            else:
+                h = h + emb_out
+                h = self.out_layers(h)
+            return self.skip_connection(x) + h
 
 
 class AttentionBlock(nn.Module):
@@ -322,7 +323,13 @@ class AttentionBlock(nn.Module):
         h = self.attention(qkv)
         h = self.proj_out(h)
         return (x + h).reshape(b, c, *spatial)
-
+        """
+        with th.cuda.amp.autocast():
+            qkv = self.qkv(self.norm(x))
+            h = self.attention(qkv)
+            h = self.proj_out(h)
+            return (x + h).reshape(b, c, *spatial)
+        """
 
 def count_flops_attn(model, _x, y):
     """
@@ -454,6 +461,7 @@ class UNetModel(nn.Module):
         dims=2,
         num_classes=None,
         use_checkpoint=False,
+        #use_fp16=True,
         use_fp16=False,
         num_heads=-1,
         num_head_channels=-1,
@@ -464,7 +472,7 @@ class UNetModel(nn.Module):
         use_spatial_transformer=False,    # custom transformer support
         transformer_depth=1,              # custom transformer support
         context_dim=None,                 # custom transformer support
-        n_embed=None,                     # custom support for prediction of discrete ids into codebook of first stage vq model
+        n_embed=None,                      # custom support for prediction of discrete ids into codebook of first stage vq model
         legacy=True,
     ):
         super().__init__()
@@ -545,7 +553,7 @@ class UNetModel(nn.Module):
                         num_heads = ch // num_head_channels
                         dim_head = num_head_channels
                     if legacy:
-                        #num_heads = 1
+                        num_heads = 1
                         dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
                     layers.append(
                         AttentionBlock(
@@ -592,7 +600,7 @@ class UNetModel(nn.Module):
             num_heads = ch // num_head_channels
             dim_head = num_head_channels
         if legacy:
-            #num_heads = 1
+            num_heads = 1
             dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
         self.middle_block = TimestepEmbedSequential(
             ResBlock(
@@ -646,7 +654,7 @@ class UNetModel(nn.Module):
                         num_heads = ch // num_head_channels
                         dim_head = num_head_channels
                     if legacy:
-                        #num_heads = 1
+                        num_heads = 1
                         dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
                     layers.append(
                         AttentionBlock(
@@ -761,7 +769,8 @@ class EncoderUNetModel(nn.Module):
         conv_resample=True,
         dims=2,
         use_checkpoint=False,
-        use_fp16=False,
+        #use_fp16=False,
+        use_fp16=True,
         num_heads=1,
         num_head_channels=-1,
         num_heads_upsample=-1,

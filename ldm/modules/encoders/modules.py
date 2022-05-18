@@ -12,7 +12,15 @@ class AbstractEncoder(nn.Module):
     def encode(self, *args, **kwargs):
         raise NotImplementedError
 
+class DummyEncoder(nn.Module):
+    def __init__(self, key="keypoints"):
+        super().__init__()
+        self.key = key
 
+    def encode(self, batch):
+        #import pdb; pdb.set_trace()
+        return batch
+        #return batch[key][:,None]
 
 class ClassEmbedder(nn.Module):
     def __init__(self, embed_dim, n_classes=1000, key='class'):

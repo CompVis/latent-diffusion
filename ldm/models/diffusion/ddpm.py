@@ -25,6 +25,12 @@ from ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, Autoenc
 from ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
 from ldm.models.diffusion.ddim import DDIMSampler
 
+from PIL import Image as pil_image, ImageDraw as pil_img_draw, ImageFont
+from typing import Dict, Tuple, Optional, NamedTuple, Union
+from torch import LongTensor, Tensor
+from _util.twodee_v0 import *
+import _util.keypoints_v0 as ukp
+from torchvision.transforms import PILToTensor
 
 __conditioning_keys__ = {'concat': 'c_concat',
                          'crossattn': 'c_crossattn',
@@ -462,6 +468,7 @@ class LatentDiffusion(DDPM):
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
         self.bbox_tokenizer = None  
+        self.pil_to_tensor = PILToTensor()
 
         self.restarted_from_ckpt = False
         if ckpt_path is not None:
@@ -664,7 +671,7 @@ class LatentDiffusion(DDPM):
             if cond_key is None:
                 cond_key = self.cond_stage_key
             if cond_key != self.first_stage_key:
-                if cond_key in ['caption', 'coordinates_bbox']:
+                if cond_key in ['caption', 'coordinates_bbox', 'keypoints']:
                     xc = batch[cond_key]
                 elif cond_key == 'class_label':
                     xc = batch
@@ -672,9 +679,8 @@ class LatentDiffusion(DDPM):
                     xc = super().get_input(batch, cond_key).to(self.device)
             else:
                 xc = x
-            if not self.cond_stage_trainable or force_c_encode:
+            if not self.cond_stage_trainable or force_c_encode and cond_key != "keypoints":
                 if isinstance(xc, dict) or isinstance(xc, list):
-                    # import pudb; pudb.set_trace()
                     c = self.get_learned_conditioning(xc)
                 else:
                     c = self.get_learned_conditioning(xc.to(self.device))
@@ -863,9 +869,10 @@ class LatentDiffusion(DDPM):
             return self.first_stage_model.encode(x)
 
     def shared_step(self, batch, **kwargs):
-        x, c = self.get_input(batch, self.first_stage_key)
-        loss = self(x, c)
-        return loss
+        with torch.cuda.amp.autocast():
+            x, c = self.get_input(batch, self.first_stage_key)
+            loss = self(x, c)
+            return loss
 
     def forward(self, x, c, *args, **kwargs):
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
@@ -1246,6 +1253,44 @@ class LatentDiffusion(DDPM):
 
         return samples, intermediates
 
+    @torch.no_grad()
+    def coordinates_from_token(self, token: int, dim: int) -> (float, float):
+        x = token % dim
+        y = token // dim
+        return x, y
+
+    @torch.no_grad()
+    def convert_pil_to_tensor(self, image) -> Tensor:
+        with warnings.catch_warnings():
+            # to filter PyTorch UserWarning as described here: https://github.com/pytorch/vision/issues/2194
+            warnings.simplefilter("ignore")
+            return self.pil_to_tensor(image)
+
+    @torch.no_grad()
+    def plot_keypoints_from_tensor(self, conditional: LongTensor, figure_size: Tuple[int, int]) -> Tensor:
+        #inverse build
+        keypoints_dict = {}
+        conditional_list = conditional[0].tolist()
+        for i in zip(conditional_list, ukp.coco_keypoints):
+            keypoints_dict[i[1]] = self.coordinates_from_token(i[0], dim = 32)
+        if figure_size[0] != 32:
+            for k in keypoints_dict.keys():
+                keypoints_dict[k] = (keypoints_dict[k][0] * int(figure_size[0]/32), keypoints_dict[k][1] * int(figure_size[0]/32))
+        #print("!!!!!!!!!!!!!!!!!!!dict!!!!!!!!!!!!!!!!!")
+        #print(keypoints_dict)
+        plot = PIL.Image.new(mode="RGB", size=figure_size)
+        v = I(plot)
+        keypoints = np.asarray([keypoints_dict[k] for k in ukp.coco_keypoints])
+        for (a,b),c in zip(ukp.coco_parts, ukp.coco_part_colors):
+            #print("dsfndkjashfdkjsfhkjfhdskhfdkashf8888888888888888888")
+            #print(keypoints[a])
+            #print(keypoints[b])
+            v = v.line(keypoints[a], keypoints[b], w=1, c=c)
+        keypoints = keypoints[:len(ukp.coco_keypoints)]
+        for kp in keypoints:
+            v = v.dot(kp, s=1, c='r')
+        return self.convert_pil_to_tensor(v.pil(mode = "RGB")) / 127.5 - 1.
+
 
     @torch.no_grad()
     def log_images(self, batch, N=8, n_row=4, sample=True, ddim_steps=200, ddim_eta=1., return_keys=None,
@@ -1271,6 +1316,12 @@ class LatentDiffusion(DDPM):
             elif self.cond_stage_key in ["caption"]:
                 xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["caption"])
                 log["conditioning"] = xc
+            elif self.cond_stage_key in ["keypoints"]:
+                figure_size = (x.shape[2], x.shape[3])
+                log["conditioning"] = torch.zeros_like(log["reconstruction"])
+                for i in range(N):
+                    log["conditioning"][i] = self.plot_keypoints_from_tensor(batch["keypoints"][i], figure_size)
+                log["conditioning_rec"] = log["conditioning"]
             elif self.cond_stage_key == 'class_label':
                 xc = log_txt_as_img((x.shape[2], x.shape[3]), batch["human_label"])
                 log['conditioning'] = xc
