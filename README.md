@@ -1,3 +1,33 @@
+# Fork of Latent Diffusion Models - added danbooru config
+
+Keypoints json format dataset is uploaded to google drive:
+
+[https://drive.google.com/file/d/1KqdDfUJQkY-8MoQhnCCTXq-YpDciZlco/view?usp=sharing](https://drive.google.com/file/d/1KqdDfUJQkY-8MoQhnCCTXq-YpDciZlco/view?usp=sharing)
+
+Make sure to place images under xxx/yyy/images folder and keypoints goes to xxx/yyy/keypoints folder, or, edit the ldm/data/base_616.py to load keypoints from anywhere you like
+
+Training using danbooru pose keypoints dataset can be run as:
+
+```shell script
+CUDA_VISIBLE_DEVICES=<GPU_ID> python main.py --base configs/latent-diffusion/danbooru-keypoints-ldm-vq-4.yaml -t --gpus 0,
+``` 
+
+Pretrained vq-f4-danbooru model is uploaded to google drive:
+
+[https://drive.google.com/file/d/1DUHGXCs2Rq5c5bfKPvZc7ap_FCgJLhbW/view?usp=sharing](https://drive.google.com/file/d/1DUHGXCs2Rq5c5bfKPvZc7ap_FCgJLhbW/view?usp=sharing)
+
+Pretrained ldm keypoints danbooru model is uploaded to google drive:
+
+[https://drive.google.com/file/d/1SYOR-ZIdviiboVEDJALSq6ttJVodqb4v/view?usp=sharing](https://drive.google.com/file/d/1SYOR-ZIdviiboVEDJALSq6ttJVodqb4v/view?usp=sharing)
+
+Sample using pose keypoints can be run as:
+```shell script
+for i in `ls example_pose_keypoints`;
+do
+    python scripts/sample_pose_diffusion.py -r models/ldm/keypoints_danbooru256/model.ckpt -p example_pose_keypoints/$i -l /tmp/logdir -n 50 --batch_size 1 -c 500 -e 0.0
+done
+``` 
+
 # Latent Diffusion Models
 [arXiv](https://arxiv.org/abs/2112.10752) | [BibTeX](#bibtex)
 
