@@ -1,5 +1,7 @@
 # Fork of Latent Diffusion Models - added danbooru config
 
+![danbooru_example](assets/ldm_example.jpg) 
+
 Keypoints json format dataset is uploaded to google drive:
 
 [https://drive.google.com/file/d/1KqdDfUJQkY-8MoQhnCCTXq-YpDciZlco/view?usp=sharing](https://drive.google.com/file/d/1KqdDfUJQkY-8MoQhnCCTXq-YpDciZlco/view?usp=sharing)
@@ -28,12 +30,12 @@ do
 done
 ``` 
 
+Without cherry picking, the output quality is rather poor due to lack of data and low computing specs, a random sample grid using real world pose is shown below:
+
+![danbooru_random_example](assets/total_grid.jpg) 
+
 # Latent Diffusion Models
 [arXiv](https://arxiv.org/abs/2112.10752) | [BibTeX](#bibtex)
-
-<p align="center">
-<img src=assets/results.gif />
-</p>
 
 
 
