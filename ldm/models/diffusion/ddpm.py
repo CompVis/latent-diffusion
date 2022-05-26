@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
-from typing import Dict, Literal, List
+from typing import Dict, Literal, List, Tuple
 from pytorch_lightning.utilities.distributed import rank_zero_only
 
 from ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
@@ -348,7 +348,7 @@ class DDPM(pl.LightningModule):
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         return self.p_losses(x, t, *args, **kwargs)
 
-    def get_input(self, batch, k):
+    def get_input(self, batch: Tensor, k: str):
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
@@ -580,7 +580,7 @@ class LatentDiffusion(DDPM):
         denoise_grid = make_grid(denoise_grid, nrow=n_imgs_per_row)
         return denoise_grid
 
-    def get_first_stage_encoding(self, encoder_posterior):
+    def get_first_stage_encoding(self, encoder_posterior: Tensor):
         if isinstance(encoder_posterior, DiagonalGaussianDistribution):
             z = encoder_posterior.sample()
         elif isinstance(encoder_posterior, torch.Tensor):
@@ -602,14 +602,13 @@ class LatentDiffusion(DDPM):
             c = getattr(self.cond_stage_model, self.cond_stage_forward)(c)
         return c
 
-    def meshgrid(self, h, w):
+    def meshgrid(self, h: int, w: int):
         y = torch.arange(0, h).view(h, 1, 1).repeat(1, w, 1)
         x = torch.arange(0, w).view(1, w, 1).repeat(h, 1, 1)
-
         arr = torch.cat([y, x], dim=-1)
         return arr
 
-    def delta_border(self, h, w):
+    def delta_border(self, h: int, w: int):
         """
         :param h: height
         :param w: width
@@ -623,23 +622,40 @@ class LatentDiffusion(DDPM):
         edge_dist = torch.min(torch.cat([dist_left_up, dist_right_down], dim=-1), dim=-1)[0]
         return edge_dist
 
-    def get_weighting(self, h, w, Ly, Lx, device):
+    def get_weighting(
+        self,
+        h: int,
+        w: int,
+        Ly: int,
+        Lx: int,
+        device: torch.device,
+    ):
         weighting = self.delta_border(h, w)
-        weighting = torch.clip(weighting, self.split_input_params["clip_min_weight"],
-                               self.split_input_params["clip_max_weight"], )
+        weighting = torch.clip(
+            weighting,
+            self.split_input_params["clip_min_weight"],
+            self.split_input_params["clip_max_weight"],)
         weighting = weighting.view(1, h * w, 1).repeat(1, 1, Ly * Lx).to(device)
 
         if self.split_input_params["tie_braker"]:
             L_weighting = self.delta_border(Ly, Lx)
-            L_weighting = torch.clip(L_weighting,
-                                     self.split_input_params["clip_min_tie_weight"],
-                                     self.split_input_params["clip_max_tie_weight"])
-
+            L_weighting = torch.clip(
+                L_weighting,
+                self.split_input_params["clip_min_tie_weight"],
+                self.split_input_params["clip_max_tie_weight"],)
             L_weighting = L_weighting.view(1, 1, Ly * Lx).to(device)
             weighting = weighting * L_weighting
+
         return weighting
 
-    def get_fold_unfold(self, x, kernel_size, stride, uf=1, df=1):  # todo load once not every time, shorten code
+    def get_fold_unfold(
+        self,
+        x: Tensor,
+        kernel_size: Tuple,
+        stride: Tuple,
+        uf: int = 1,
+        df: int = 1,
+    ):  # todo load once not every time, shorten code
         """
         :param x: img of size (bs, c, h, w)
         :return: n img crops of size (n, bs, c, kernel_size[0], kernel_size[1])
@@ -653,47 +669,52 @@ class LatentDiffusion(DDPM):
         if uf == 1 and df == 1:
             fold_params = dict(kernel_size=kernel_size, dilation=1, padding=0, stride=stride)
             unfold = torch.nn.Unfold(**fold_params)
-
             fold = torch.nn.Fold(output_size=x.shape[2:], **fold_params)
 
             weighting = self.get_weighting(kernel_size[0], kernel_size[1], Ly, Lx, x.device).to(x.dtype)
             normalization = fold(weighting).view(1, 1, h, w)  # normalizes the overlap
-            weighting = weighting.view((1, 1, kernel_size[0], kernel_size[1], Ly * Lx))
-
+            weighting = weighting.view((1, 1, kernel_size[0], kernel_size[1], Ly*Lx))
         elif uf > 1 and df == 1:
             fold_params = dict(kernel_size=kernel_size, dilation=1, padding=0, stride=stride)
             unfold = torch.nn.Unfold(**fold_params)
+            fold_params2 = dict(
+                kernel_size=(kernel_size[0]*uf, kernel_size[0]*uf),
+                dilation=1,
+                padding=0,
+                stride=(stride[0]*uf, stride[1]*uf))
+            fold = torch.nn.Fold(output_size=(x.shape[2]*uf, x.shape[3]*uf), **fold_params2)
 
-            fold_params2 = dict(kernel_size=(kernel_size[0] * uf, kernel_size[0] * uf),
-                                dilation=1, padding=0,
-                                stride=(stride[0] * uf, stride[1] * uf))
-            fold = torch.nn.Fold(output_size=(x.shape[2] * uf, x.shape[3] * uf), **fold_params2)
-
-            weighting = self.get_weighting(kernel_size[0] * uf, kernel_size[1] * uf, Ly, Lx, x.device).to(x.dtype)
-            normalization = fold(weighting).view(1, 1, h * uf, w * uf)  # normalizes the overlap
-            weighting = weighting.view((1, 1, kernel_size[0] * uf, kernel_size[1] * uf, Ly * Lx))
-
+            weighting = self.get_weighting(kernel_size[0]*uf, kernel_size[1]*uf, Ly, Lx, x.device).to(x.dtype)
+            normalization = fold(weighting).view(1, 1, h*uf, w*uf)  # normalizes the overlap
+            weighting = weighting.view((1, 1, kernel_size[0]*uf, kernel_size[1]*uf, Ly*Lx))
         elif df > 1 and uf == 1:
             fold_params = dict(kernel_size=kernel_size, dilation=1, padding=0, stride=stride)
             unfold = torch.nn.Unfold(**fold_params)
+            fold_params2 = dict(
+                kernel_size=(kernel_size[0]//df, kernel_size[0]//df),
+                dilation=1,
+                padding=0,
+                stride=(stride[0]//df, stride[1]//df))
+            fold = torch.nn.Fold(output_size=(x.shape[2]//df, x.shape[3]//df), **fold_params2)
 
-            fold_params2 = dict(kernel_size=(kernel_size[0] // df, kernel_size[0] // df),
-                                dilation=1, padding=0,
-                                stride=(stride[0] // df, stride[1] // df))
-            fold = torch.nn.Fold(output_size=(x.shape[2] // df, x.shape[3] // df), **fold_params2)
-
-            weighting = self.get_weighting(kernel_size[0] // df, kernel_size[1] // df, Ly, Lx, x.device).to(x.dtype)
-            normalization = fold(weighting).view(1, 1, h // df, w // df)  # normalizes the overlap
-            weighting = weighting.view((1, 1, kernel_size[0] // df, kernel_size[1] // df, Ly * Lx))
-
+            weighting = self.get_weighting(kernel_size[0]//df, kernel_size[1]//df, Ly, Lx, x.device).to(x.dtype)
+            normalization = fold(weighting).view(1, 1, h//df, w//df)  # normalizes the overlap
+            weighting = weighting.view((1, 1, kernel_size[0]//df, kernel_size[1]//df, Ly*Lx))
         else:
             raise NotImplementedError
 
         return fold, unfold, normalization, weighting
 
     @torch.no_grad()
-    def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
-                  cond_key=None, return_original_cond=False, bs=None):
+    def get_input(
+        self,
+        batch: Tensor,
+        k: str,
+        return_first_stage_outputs: bool = False,
+        force_c_encode: bool = False,
+        cond_key: str = None,
+        return_original_cond: bool = False,
+        bs: int = None):
         x = super().get_input(batch, k)
         if bs is not None:
             x = x[:bs]
@@ -781,8 +802,8 @@ class LatentDiffusion(DDPM):
                 # 2. apply model loop over last dim
                 if isinstance(self.first_stage_model, VQModelInterface):
                     output_list = [
-                        self.first_stage_model.decode(z[:, :, :, :, i],
-                        force_not_quantize=predict_cids or force_not_quantize) for i in range(z.shape[-1])]
+                        self.first_stage_model.decode(z[:, :, :, :, i], force_not_quantize=predict_cids or force_not_quantize)
+                        for i in range(z.shape[-1])]
                 else:
                     output_list = [
                         self.first_stage_model.decode(z[:, :, :, :, i]) for i in range(z.shape[-1])]
@@ -867,7 +888,7 @@ class LatentDiffusion(DDPM):
                 return self.first_stage_model.decode(z)
 
     @torch.no_grad()
-    def encode_first_stage(self, x):
+    def encode_first_stage(self, x: Tensor):
         if hasattr(self, "split_input_params"):
             if self.split_input_params["patch_distributed_vq"]:
                 ks = self.split_input_params["ks"]  # eg. (128, 128)
@@ -888,8 +909,7 @@ class LatentDiffusion(DDPM):
                 # Reshape to img shape
                 z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
 
-                output_list = [self.first_stage_model.encode(z[:, :, :, :, i])
-                               for i in range(z.shape[-1])]
+                output_list = [self.first_stage_model.encode(z[:, :, :, :, i]) for i in range(z.shape[-1])]
 
                 o = torch.stack(output_list, axis=-1)
                 o = o * weighting

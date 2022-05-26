@@ -5,16 +5,35 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "scripts/super_res.py",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/super_res.py",
+            "args": [
+                "--indir",
+                "data/super_resolution",
+                "--outdir",
+                "outputs/super_resolution"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "scripts/sample_diffusion.py",
             "type": "python",
             "request": "launch",
             "program": "scripts/sample_diffusion.py",
             "args": [
-                "-r", "models/ldm/celeba256/model.ckpt",
-                "-l", "outputs/diffusion_results",
-                "-n", "10",
-                "-c", "50",
-                "-e", "0.0"
+                "-r",
+                "models/ldm/celeba256/model.ckpt",
+                "-l",
+                "outputs/diffusion_results",
+                "-n",
+                "10",
+                "-c",
+                "50",
+                "-e",
+                "0.0"
             ],
             "console": "integratedTerminal",
             "justMyCode": true
@@ -41,7 +60,7 @@
             "program": "scripts/txt2img.py",
             "args": [
                 "--prompt",
-                "A painting of a nuclear war, Trending on artstation",
+                "A beautiful epic wondrous fantasy painting of the cloud",
                 "--ddim_eta",
                 "0",
                 "--plms",
