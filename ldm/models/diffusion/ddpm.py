@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
-from typing import Dict, Literal, List, Tuple
+from typing import Dict, Literal, List, Tuple, Union
 from pytorch_lightning.utilities.distributed import rank_zero_only
 
 from ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
@@ -45,7 +45,10 @@ def uniform_on_device(r1, r2, shape, device):
 
 
 class DDPM(pl.LightningModule):
-    # classic DDPM with Gaussian diffusion, in image space
+    """
+    classic DDPM with Gaussian diffusion, in image space
+    """
+
     def __init__(
         self,
         unet_config: Dict,
@@ -56,7 +59,7 @@ class DDPM(pl.LightningModule):
         ignore_keys: List = [],
         load_only_unet: bool = False,
         monitor: str = "val/loss",
-        use_ema: str = True,
+        use_ema: bool = True,
         first_stage_key: str = "image",
         image_size: int = 256,
         channels: int = 3,
@@ -191,7 +194,7 @@ class DDPM(pl.LightningModule):
         assert not torch.isnan(self.lvlb_weights).all()
 
     @contextmanager
-    def ema_scope(self, context=None):
+    def ema_scope(self, context: str = None):
         if self.use_ema:
             self.model_ema.store(self.model.parameters())
             self.model_ema.copy_to(self.model)
@@ -293,12 +296,12 @@ class DDPM(pl.LightningModule):
         return self.p_sample_loop((batch_size, channels, image_size, image_size),
                                   return_intermediates=return_intermediates)
 
-    def q_sample(self, x_start, t, noise=None):
+    def q_sample(self, x_start: Tensor, t: Tensor, noise: Tensor = None):
         noise = default(noise, lambda: torch.randn_like(x_start))
         return (extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start +
                 extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise)
 
-    def get_loss(self, pred, target, mean=True):
+    def get_loss(self, pred: Tensor, target: Tensor, mean: bool = True):
         if self.loss_type == 'l1':
             loss = (target - pred).abs()
             if mean:
@@ -356,19 +359,15 @@ class DDPM(pl.LightningModule):
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
-    def shared_step(self, batch):
+    def shared_step(self, batch: Dict):
         x = self.get_input(batch, self.first_stage_key)
         loss, loss_dict = self(x)
         return loss, loss_dict
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch: Dict, batch_idx: int):
         loss, loss_dict = self.shared_step(batch)
-
-        self.log_dict(loss_dict, prog_bar=True,
-                      logger=True, on_step=True, on_epoch=True)
-
-        self.log("global_step", self.global_step,
-                 prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+        self.log("global_step", self.global_step, prog_bar=True, logger=True, on_step=True, on_epoch=False)
 
         if self.use_scheduler:
             lr = self.optimizers().param_groups[0]['lr']
@@ -377,7 +376,7 @@ class DDPM(pl.LightningModule):
         return loss
 
     @torch.no_grad()
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch: Dict, batch_idx: int):
         _, loss_dict_no_ema = self.shared_step(batch)
         with self.ema_scope():
             _, loss_dict_ema = self.shared_step(batch)
@@ -504,7 +503,7 @@ class LatentDiffusion(DDPM):
 
     @rank_zero_only
     @torch.no_grad()
-    def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
+    def on_train_batch_start(self, batch: Dict, batch_idx: int, dataloader_idx: int):
         # only for very first batch
         if self.scale_by_std and self.current_epoch == 0 and self.global_step == 0 and batch_idx == 0 and not self.restarted_from_ckpt:
             assert self.scale_factor == 1., 'rather not use custom rescaling and std-rescaling simultaneously'
@@ -589,7 +588,7 @@ class LatentDiffusion(DDPM):
             raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c: List[str]):
+    def get_learned_conditioning(self, c: Tensor):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
                 c = self.cond_stage_model.encode(c)
@@ -714,7 +713,8 @@ class LatentDiffusion(DDPM):
         force_c_encode: bool = False,
         cond_key: str = None,
         return_original_cond: bool = False,
-        bs: int = None):
+        bs: int = None,
+    ):
         x = super().get_input(batch, k)
         if bs is not None:
             x = x[:bs]
@@ -926,12 +926,12 @@ class LatentDiffusion(DDPM):
         else:
             return self.first_stage_model.encode(x)
 
-    def shared_step(self, batch, **kwargs):
+    def shared_step(self, batch: Dict, **kwargs):
         x, c = self.get_input(batch, self.first_stage_key)
         loss = self(x, c)
         return loss
 
-    def forward(self, x, c, *args, **kwargs):
+    def forward(self, x: Tensor, c: Union[Tensor, Dict], *args, **kwargs):
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         if self.model.conditioning_key is not None:
             assert c is not None
@@ -1075,7 +1075,7 @@ class LatentDiffusion(DDPM):
         kl_prior = normal_kl(mean1=qt_mean, logvar1=qt_log_variance, mean2=0.0, logvar2=0.0)
         return mean_flat(kl_prior) / np.log(2.0)
 
-    def p_losses(self, x_start, cond, t, noise=None):
+    def p_losses(self, x_start: Tensor, cond: Tensor, t: Tensor, noise: Tensor = None):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         model_output = self.apply_model(x_noisy, t, cond)
@@ -1439,12 +1439,11 @@ class LatentDiffusion(DDPM):
             scheduler = instantiate_from_config(self.scheduler_config)
 
             print("Setting up LambdaLR scheduler...")
-            scheduler = [
-                {
-                    'scheduler': LambdaLR(opt, lr_lambda=scheduler.schedule),
-                    'interval': 'step',
-                    'frequency': 1
-                }]
+            scheduler = [{
+                'scheduler': LambdaLR(opt, lr_lambda=scheduler.schedule),
+                'interval': 'step',
+                'frequency': 1
+            }]
             return [opt], scheduler
         return opt
 

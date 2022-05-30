@@ -71,7 +71,7 @@ class VQModel(pl.LightningModule):
         self.lr_g_factor = lr_g_factor
 
     @contextmanager
-    def ema_scope(self, context=None):
+    def ema_scope(self, context: str = None):
         if self.use_ema:
             self.model_ema.store(self.parameters())
             self.model_ema.copy_to(self)
@@ -85,7 +85,7 @@ class VQModel(pl.LightningModule):
                 if context is not None:
                     print(f"{context}: Restored training weights")
 
-    def init_from_ckpt(self, path, ignore_keys=list()):
+    def init_from_ckpt(self, path: str, ignore_keys: List[str] = []):
         sd = torch.load(path, map_location="cpu")["state_dict"]
         keys = list(sd.keys())
         for k in keys:

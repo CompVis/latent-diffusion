@@ -5,6 +5,42 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "main.py - train ldm imagenet",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": [
+                "--base", "configs/latent-diffusion/cin-ldm-vq-f8.yaml",
+                "--gpus", "0,",
+                "-t"
+            ],
+            "env": {
+                "XDG_CACHE_HOME": "/home/xiaguo/Downloads/ILSVRC2017"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "scripts/sample_imagenet.py",
+            "type": "python",
+            "request": "launch",
+            "program": "scripts/sample_imagenet.py",
+            "args": [
+                "-r",
+                "models/ldm/cin256/model.ckpt",
+                "-l",
+                "outputs/imagenet_results",
+                "-n",
+                "6",
+                "-c",
+                "50",
+                "-e",
+                "1.0"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "scripts/super_res.py",
             "type": "python",
             "request": "launch",

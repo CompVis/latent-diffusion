@@ -3,15 +3,22 @@ from torch import nn
 
 
 class LitEma(nn.Module):
-    def __init__(self, model, decay=0.9999, use_num_upates=True):
+
+    def __init__(
+        self,
+        model: nn.Module,
+        decay: float = 0.9999,
+        use_num_upates: bool = True,
+    ):
         super().__init__()
         if decay < 0.0 or decay > 1.0:
             raise ValueError('Decay must be between 0 and 1')
 
         self.m_name2s_name = {}
         self.register_buffer('decay', torch.tensor(decay, dtype=torch.float32))
-        self.register_buffer('num_updates', torch.tensor(0,dtype=torch.int) if use_num_upates
-                             else torch.tensor(-1,dtype=torch.int))
+        self.register_buffer(
+            'num_updates',
+            torch.tensor(0, dtype=torch.int) if use_num_upates else torch.tensor(-1, dtype=torch.int))
 
         for name, p in model.named_parameters():
             if p.requires_grad:
@@ -22,7 +29,7 @@ class LitEma(nn.Module):
 
         self.collected_params = []
 
-    def forward(self,model):
+    def forward(self, model: nn.Module):
         decay = self.decay
 
         if self.num_updates >= 0:
@@ -43,7 +50,7 @@ class LitEma(nn.Module):
                 else:
                     assert not key in self.m_name2s_name
 
-    def copy_to(self, model):
+    def copy_to(self, model: nn.Module):
         m_param = dict(model.named_parameters())
         shadow_params = dict(self.named_buffers())
         for key in m_param:

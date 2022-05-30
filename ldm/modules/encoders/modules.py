@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+
 from functools import partial
+from torch import Tensor
 
 from ldm.modules.x_transformer import Encoder, TransformerWrapper  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
 
@@ -17,12 +19,12 @@ class AbstractEncoder(nn.Module):
 
 class ClassEmbedder(nn.Module):
 
-    def __init__(self, embed_dim, n_classes=1000, key='class'):
+    def __init__(self, embed_dim: int, n_classes: int = 1000, key: str = 'class'):
         super().__init__()
         self.key = key
         self.embedding = nn.Embedding(n_classes, embed_dim)
 
-    def forward(self, batch, key=None):
+    def forward(self, batch: Tensor, key: str = None):
         if key is None:
             key = self.key
         # this is for use in crossattn
