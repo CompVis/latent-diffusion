@@ -6,7 +6,7 @@ import numpy as np
 
 from tqdm import tqdm
 from torch import Tensor
-from typing import Any, Callable, Dict, Literal, List, Union
+from typing import Any, Callable, Dict, List, Union
 
 from ldm.modules.diffusionmodules.util import (
     make_ddim_sampling_parameters,
@@ -20,7 +20,7 @@ class DDIMSampler(object):
     def __init__(
         self,
         model: nn.Module,
-        schedule: Literal["linear"] = "linear",
+        schedule: str = "linear",
         **kwargs
     ):
         super().__init__()
@@ -40,7 +40,7 @@ class DDIMSampler(object):
     def make_schedule(
         self,
         ddim_num_steps: int,
-        ddim_discretize: Literal["uniform", "quad"] = "uniform",
+        ddim_discretize: str = "uniform",
         ddim_eta: float = 0.,
         verbose: bool = True
     ):

@@ -15,10 +15,10 @@
                 "-t"
             ],
             "env": {
-                "XDG_CACHE_HOME": "/home/xiaguo/Downloads/ILSVRC2017"
+                "XDG_CACHE_HOME": "/root/latent-diffusion/.data"
             },
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": false
         },
         {
             "name": "scripts/sample_imagenet.py",

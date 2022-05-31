@@ -16,7 +16,7 @@ import numpy as np
 
 from einops import repeat
 from torch import device, Size, Tensor
-from typing import Literal, Tuple, Callable, Generator, Any
+from typing import Tuple, Callable, Generator, Any
 
 from ldm.util import instantiate_from_config
 
@@ -48,7 +48,7 @@ def make_beta_schedule(
 
 
 def make_ddim_timesteps(
-    ddim_discr_method: Literal["uniform", "quad"],
+    ddim_discr_method: str,
     num_ddim_timesteps: int,
     num_ddpm_timesteps: int,
     verbose: bool = True,
