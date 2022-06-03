@@ -1,11 +1,13 @@
 """shout-out to https://github.com/lucidrains/x-transformers/tree/main/x_transformers"""
 import torch
-from torch import nn, einsum
 import torch.nn.functional as F
-from functools import partial
-from inspect import isfunction
+
 from collections import namedtuple
 from einops import rearrange, repeat, reduce
+from functools import partial
+from inspect import isfunction
+from torch import nn, einsum, Tensor
+from typing import Tuple, Dict, Callable, Any
 
 # constants
 
@@ -23,7 +25,8 @@ LayerIntermediates = namedtuple('Intermediates', [
 
 
 class AbsolutePositionalEmbedding(nn.Module):
-    def __init__(self, dim, max_seq_len):
+
+    def __init__(self, dim: int, max_seq_len: int):
         super().__init__()
         self.emb = nn.Embedding(max_seq_len, dim)
         self.init_()
@@ -31,18 +34,19 @@ class AbsolutePositionalEmbedding(nn.Module):
     def init_(self):
         nn.init.normal_(self.emb.weight, std=0.02)
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         n = torch.arange(x.shape[1], device=x.device)
         return self.emb(n)[None, :, :]
 
 
 class FixedPositionalEmbedding(nn.Module):
-    def __init__(self, dim):
+
+    def __init__(self, dim: int):
         super().__init__()
         inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer('inv_freq', inv_freq)
 
-    def forward(self, x, seq_dim=1, offset=0):
+    def forward(self, x: Tensor, seq_dim: int = 1, offset: int = 0):
         t = torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq) + offset
         sinusoid_inp = torch.einsum('i , j -> i j', t, self.inv_freq)
         emb = torch.cat((sinusoid_inp.sin(), sinusoid_inp.cos()), dim=-1)
@@ -51,35 +55,35 @@ class FixedPositionalEmbedding(nn.Module):
 
 # helpers
 
-def exists(val):
+def exists(val: Any):
     return val is not None
 
 
-def default(val, d):
+def default(val: Any, d: Any):
     if exists(val):
         return val
     return d() if isfunction(d) else d
 
 
-def always(val):
+def always(val: Any):
     def inner(*args, **kwargs):
         return val
     return inner
 
 
-def not_equals(val):
+def not_equals(val: Any):
     def inner(x):
         return x != val
     return inner
 
 
-def equals(val):
+def equals(val: Any):
     def inner(x):
         return x == val
     return inner
 
 
-def max_neg_value(tensor):
+def max_neg_value(tensor: Tensor):
     return -torch.finfo(tensor.dtype).max
 
 
@@ -90,7 +94,7 @@ def pick_and_pop(keys, d):
     return dict(zip(keys, values))
 
 
-def group_dict_by_key(cond, d):
+def group_dict_by_key(cond: Callable[[str], bool], d: Dict):
     return_val = [dict(), dict()]
     for key in d.keys():
         match = bool(cond(key))
@@ -99,15 +103,15 @@ def group_dict_by_key(cond, d):
     return (*return_val,)
 
 
-def string_begins_with(prefix, str):
+def string_begins_with(prefix: str, str: str):
     return str.startswith(prefix)
 
 
-def group_by_key_prefix(prefix, d):
+def group_by_key_prefix(prefix: str, d: Dict):
     return group_dict_by_key(partial(string_begins_with, prefix), d)
 
 
-def groupby_prefix_and_trim(prefix, d):
+def groupby_prefix_and_trim(prefix: str, d: Dict):
     kwargs_with_prefix, kwargs = group_dict_by_key(partial(string_begins_with, prefix), d)
     kwargs_without_prefix = dict(map(lambda x: (x[0][len(prefix):], x[1]), tuple(kwargs_with_prefix.items())))
     return kwargs_without_prefix, kwargs
@@ -126,51 +130,56 @@ class Scale(nn.Module):
 
 
 class Rezero(nn.Module):
-    def __init__(self, fn):
+
+    def __init__(self, fn: Callable):
         super().__init__()
         self.fn = fn
         self.g = nn.Parameter(torch.zeros(1))
 
-    def forward(self, x, **kwargs):
+    def forward(self, x: Tensor, **kwargs):
         x, *rest = self.fn(x, **kwargs)
         return (x * self.g, *rest)
 
 
 class ScaleNorm(nn.Module):
-    def __init__(self, dim, eps=1e-5):
+
+    def __init__(self, dim: int, eps: float = 1e-5):
         super().__init__()
         self.scale = dim ** -0.5
         self.eps = eps
         self.g = nn.Parameter(torch.ones(1))
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         norm = torch.norm(x, dim=-1, keepdim=True) * self.scale
         return x / norm.clamp(min=self.eps) * self.g
 
 
 class RMSNorm(nn.Module):
-    def __init__(self, dim, eps=1e-8):
+
+    def __init__(self, dim: int, eps: float = 1e-8):
         super().__init__()
         self.scale = dim ** -0.5
         self.eps = eps
         self.g = nn.Parameter(torch.ones(dim))
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         norm = torch.norm(x, dim=-1, keepdim=True) * self.scale
         return x / norm.clamp(min=self.eps) * self.g
 
 
 class Residual(nn.Module):
-    def forward(self, x, residual):
+
+    def forward(self, x: Tensor, residual: Tensor):
         return x + residual
 
 
 class GRUGating(nn.Module):
-    def __init__(self, dim):
+
+    def __init__(self, dim: int):
         super().__init__()
         self.gru = nn.GRUCell(dim, dim)
 
-    def forward(self, x, residual):
+    def forward(self, x: Tensor, residual: Tensor):
         gated_output = self.gru(
             rearrange(x, 'b n d -> (b n) d'),
             rearrange(residual, 'b n d -> (b n) d')
@@ -182,17 +191,26 @@ class GRUGating(nn.Module):
 # feedforward
 
 class GEGLU(nn.Module):
-    def __init__(self, dim_in, dim_out):
+
+    def __init__(self, dim_in: int, dim_out: int):
         super().__init__()
         self.proj = nn.Linear(dim_in, dim_out * 2)
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         x, gate = self.proj(x).chunk(2, dim=-1)
         return x * F.gelu(gate)
 
 
 class FeedForward(nn.Module):
-    def __init__(self, dim, dim_out=None, mult=4, glu=False, dropout=0.):
+
+    def __init__(
+        self,
+        dim: int,
+        dim_out: int = None,
+        mult: int = 4,
+        glu: bool = False,
+        dropout: float = 0.,
+    ):
         super().__init__()
         inner_dim = int(dim * mult)
         dim_out = default(dim_out, dim)
@@ -207,25 +225,26 @@ class FeedForward(nn.Module):
             nn.Linear(inner_dim, dim_out)
         )
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         return self.net(x)
 
 
 # attention.
 class Attention(nn.Module):
+
     def __init__(
-            self,
-            dim,
-            dim_head=DEFAULT_DIM_HEAD,
-            heads=8,
-            causal=False,
-            mask=None,
-            talking_heads=False,
-            sparse_topk=None,
-            use_entmax15=False,
-            num_mem_kv=0,
-            dropout=0.,
-            on_attn=False
+        self,
+        dim: int,
+        dim_head: int = DEFAULT_DIM_HEAD,
+        heads: int = 8,
+        causal: bool = False,
+        mask: Tensor = None,
+        talking_heads: bool = False,
+        sparse_topk: int = None,
+        use_entmax15: bool = False,
+        num_mem_kv: int = 0,
+        dropout: float = 0.,
+        on_attn: bool = False
     ):
         super().__init__()
         if use_entmax15:
@@ -266,15 +285,15 @@ class Attention(nn.Module):
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim * 2), nn.GLU()) if on_attn else nn.Linear(inner_dim, dim)
 
     def forward(
-            self,
-            x,
-            context=None,
-            mask=None,
-            context_mask=None,
-            rel_pos=None,
-            sinusoidal_emb=None,
-            prev_attn=None,
-            mem=None
+        self,
+        x: Tensor,
+        context: Tensor = None,
+        mask: Tensor = None,
+        context_mask: Tensor = None,
+        rel_pos: Tensor = None,
+        sinusoidal_emb: Tensor = None,
+        prev_attn: Tensor = None,
+        mem: Tensor = None
     ):
         b, n, _, h, talking_heads, device = *x.shape, self.heads, self.talking_heads, x.device
         kv_input = default(context, x)
@@ -368,29 +387,30 @@ class Attention(nn.Module):
 
 
 class AttentionLayers(nn.Module):
+
     def __init__(
-            self,
-            dim,
-            depth,
-            heads=8,
-            causal=False,
-            cross_attend=False,
-            only_cross=False,
-            use_scalenorm=False,
-            use_rmsnorm=False,
-            use_rezero=False,
-            rel_pos_num_buckets=32,
-            rel_pos_max_distance=128,
-            position_infused_attn=False,
-            custom_layers=None,
-            sandwich_coef=None,
-            par_ratio=None,
-            residual_attn=False,
-            cross_residual_attn=False,
-            macaron=False,
-            pre_norm=True,
-            gate_residual=False,
-            **kwargs
+        self,
+        dim: int,
+        depth: int,
+        heads: int = 8,
+        causal: bool = False,
+        cross_attend: bool = False,
+        only_cross: bool = False,
+        use_scalenorm: bool = False,
+        use_rmsnorm: bool = False,
+        use_rezero: bool = False,
+        rel_pos_num_buckets: int = 32,
+        rel_pos_max_distance: int = 128,
+        position_infused_attn: bool = False,
+        custom_layers: Tuple = None,
+        sandwich_coef: int = None,
+        par_ratio: int = None,
+        residual_attn: bool = False,
+        cross_residual_attn: bool = False,
+        macaron: bool = False,
+        pre_norm: bool = True,
+        gate_residual: bool = False,
+        **kwargs
     ):
         super().__init__()
         ff_kwargs, kwargs = groupby_prefix_and_trim('ff_', kwargs)
@@ -479,13 +499,13 @@ class AttentionLayers(nn.Module):
             ]))
 
     def forward(
-            self,
-            x,
-            context=None,
-            mask=None,
-            context_mask=None,
-            mems=None,
-            return_hiddens=False
+        self,
+        x: Tensor,
+        context: Tensor = None,
+        mask: Tensor = None,
+        context_mask: Tensor = None,
+        mems: Tensor = None,
+        return_hiddens: bool = False
     ):
         hiddens = []
         intermediates = []
@@ -507,10 +527,20 @@ class AttentionLayers(nn.Module):
                 x = norm(x)
 
             if layer_type == 'a':
-                out, inter = block(x, mask=mask, sinusoidal_emb=self.pia_pos_emb, rel_pos=self.rel_pos,
-                                   prev_attn=prev_attn, mem=layer_mem)
+                out, inter = block(
+                    x,
+                    mask=mask,
+                    sinusoidal_emb=self.pia_pos_emb,
+                    rel_pos=self.rel_pos,
+                    prev_attn=prev_attn,
+                    mem=layer_mem)
             elif layer_type == 'c':
-                out, inter = block(x, context=context, mask=mask, context_mask=context_mask, prev_attn=prev_cross_attn)
+                out, inter = block(
+                    x,
+                    context=context,
+                    mask=mask,
+                    context_mask=context_mask,
+                    prev_attn=prev_cross_attn)
             elif layer_type == 'f':
                 out = block(x)
 
@@ -539,6 +569,7 @@ class AttentionLayers(nn.Module):
 
 
 class Encoder(AttentionLayers):
+
     def __init__(self, **kwargs):
         assert 'causal' not in kwargs, 'cannot set causality on encoder'
         super().__init__(causal=False, **kwargs)
@@ -546,18 +577,19 @@ class Encoder(AttentionLayers):
 
 
 class TransformerWrapper(nn.Module):
+
     def __init__(
-            self,
-            *,
-            num_tokens,
-            max_seq_len,
-            attn_layers,
-            emb_dim=None,
-            max_mem_len=0.,
-            emb_dropout=0.,
-            num_memory_tokens=None,
-            tie_embedding=False,
-            use_pos_emb=True
+        self,
+        *,
+        num_tokens: int,
+        max_seq_len: int,
+        attn_layers: nn.Module,
+        emb_dim: int = None,
+        max_mem_len: float = 0.,
+        emb_dropout: float = 0.,
+        num_memory_tokens: int = None,
+        tie_embedding: bool = False,
+        use_pos_emb: bool = True
     ):
         super().__init__()
         assert isinstance(attn_layers, AttentionLayers), 'attention layers must be one of Encoder or Decoder'
@@ -571,7 +603,7 @@ class TransformerWrapper(nn.Module):
 
         self.token_emb = nn.Embedding(num_tokens, emb_dim)
         self.pos_emb = AbsolutePositionalEmbedding(emb_dim, max_seq_len) if (
-                    use_pos_emb and not attn_layers.has_pos_emb) else always(0)
+            use_pos_emb and not attn_layers.has_pos_emb) else always(0)
         self.emb_dropout = nn.Dropout(emb_dropout)
 
         self.project_emb = nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
@@ -596,14 +628,14 @@ class TransformerWrapper(nn.Module):
         nn.init.normal_(self.token_emb.weight, std=0.02)
 
     def forward(
-            self,
-            x,
-            return_embeddings=False,
-            mask=None,
-            return_mems=False,
-            return_attn=False,
-            mems=None,
-            **kwargs
+        self,
+        x: Tensor,
+        return_embeddings: bool = False,
+        mask: Tensor = None,
+        return_mems: bool = False,
+        return_attn: bool = False,
+        mems: Tensor = None,
+        **kwargs
     ):
         b, n, device, num_mem = *x.shape, x.device, self.num_memory_tokens
         x = self.token_emb(x)

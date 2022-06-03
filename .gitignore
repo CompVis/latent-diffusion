@@ -1,0 +1,6 @@
+outputs/
+**/*.pyc
+**/*.egg-info
+**/*.ckpt
+.data/
+logs/

@@ -1,30 +1,45 @@
-import os, yaml, pickle, shutil, tarfile, glob
-import cv2
 import albumentations
+import cv2
+import glob
+import os
+import pickle
+import shutil
+import tarfile
+import yaml
 import PIL
+
 import numpy as np
+import taming.data.utils as tdu
 import torchvision.transforms.functional as TF
+
 from omegaconf import OmegaConf
 from functools import partial
-from PIL import Image
 from tqdm import tqdm
 from torch.utils.data import Dataset, Subset
+from PIL import Image
 
-import taming.data.utils as tdu
-from taming.data.imagenet import str_to_indices, give_synsets_from_indices, download, retrieve
+from taming.data.imagenet import (
+    str_to_indices,
+    give_synsets_from_indices,
+    download,
+    retrieve,
+)
 from taming.data.imagenet import ImagePaths
+from ldm.modules.image_degradation import (
+    degradation_fn_bsr,
+    degradation_fn_bsr_light,
+)
+from typing import Dict, List
 
-from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
-
-
-def synset2idx(path_to_yaml="data/index_synset.yaml"):
+def synset2idx(path_to_yaml: str = "data/index_synset.yaml"):
     with open(path_to_yaml) as f:
         di2s = yaml.load(f)
     return dict((v,k) for k,v in di2s.items())
 
 
 class ImageNetBase(Dataset):
-    def __init__(self, config=None):
+
+    def __init__(self, config: Dict = None):
         self.config = config or OmegaConf.create()
         if not type(self.config)==dict:
             self.config = OmegaConf.to_container(self.config)
@@ -39,13 +54,13 @@ class ImageNetBase(Dataset):
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int):
         return self.data[i]
 
     def _prepare(self):
         raise NotImplementedError()
 
-    def _filter_relpaths(self, relpaths):
+    def _filter_relpaths(self, relpaths: List):
         ignore = set([
             "n06596364_9591.JPEG",
         ])
@@ -67,8 +82,7 @@ class ImageNetBase(Dataset):
         SIZE = 2655750
         URL = "https://heibox.uni-heidelberg.de/f/9f28e956cd304264bb82/?dl=1"
         self.human_dict = os.path.join(self.root, "synset_human.txt")
-        if (not os.path.exists(self.human_dict) or
-                not os.path.getsize(self.human_dict)==SIZE):
+        if (not os.path.exists(self.human_dict) or not os.path.getsize(self.human_dict)==SIZE):
             download(URL, self.human_dict)
 
     def _prepare_idx_to_synset(self):
@@ -122,27 +136,24 @@ class ImageNetBase(Dataset):
 
         if self.process_images:
             self.size = retrieve(self.config, "size", default=256)
-            self.data = ImagePaths(self.abspaths,
-                                   labels=labels,
-                                   size=self.size,
-                                   random_crop=self.random_crop,
-                                   )
+            self.data = ImagePaths(
+                self.abspaths,
+                labels=labels,
+                size=self.size,
+                random_crop=self.random_crop,)
         else:
             self.data = self.abspaths
 
 
 class ImageNetTrain(ImageNetBase):
+
     NAME = "ILSVRC2012_train"
     URL = "http://www.image-net.org/challenges/LSVRC/2012/"
     AT_HASH = "a306397ccf9c2ead27155983c254227c0fd938e2"
-    FILES = [
-        "ILSVRC2012_img_train.tar",
-    ]
-    SIZES = [
-        147897477120,
-    ]
+    FILES = ["ILSVRC2012_img_train.tar",]
+    SIZES = [147897477120,]
 
-    def __init__(self, process_images=True, data_root=None, **kwargs):
+    def __init__(self, process_images:bool = True, data_root: str = None, **kwargs):
         self.process_images = process_images
         self.data_root = data_root
         super().__init__(**kwargs)
@@ -157,8 +168,7 @@ class ImageNetTrain(ImageNetBase):
         self.datadir = os.path.join(self.root, "data")
         self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 1281167
-        self.random_crop = retrieve(self.config, "ImageNetTrain/random_crop",
-                                    default=True)
+        self.random_crop = retrieve(self.config, "ImageNetTrain/random_crop", default=True)
         if not tdu.is_prepared(self.root):
             # prep
             print("Preparing dataset {} in {}".format(self.NAME, self.root))
@@ -195,20 +205,15 @@ class ImageNetTrain(ImageNetBase):
 
 
 class ImageNetValidation(ImageNetBase):
+
     NAME = "ILSVRC2012_validation"
     URL = "http://www.image-net.org/challenges/LSVRC/2012/"
     AT_HASH = "5d6d0df7ed81efd49ca99ea4737e0ae5e3a5f2e5"
     VS_URL = "https://heibox.uni-heidelberg.de/f/3e0f6e9c624e45f2bd73/?dl=1"
-    FILES = [
-        "ILSVRC2012_img_val.tar",
-        "validation_synset.txt",
-    ]
-    SIZES = [
-        6744924160,
-        1950000,
-    ]
+    FILES = ["ILSVRC2012_img_val.tar", "validation_synset.txt",]
+    SIZES = [6744924160, 1950000,]
 
-    def __init__(self, process_images=True, data_root=None, **kwargs):
+    def __init__(self, process_images: bool = True, data_root: str = None, **kwargs):
         self.data_root = data_root
         self.process_images = process_images
         super().__init__(**kwargs)
@@ -222,8 +227,7 @@ class ImageNetValidation(ImageNetBase):
         self.datadir = os.path.join(self.root, "data")
         self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 50000
-        self.random_crop = retrieve(self.config, "ImageNetValidation/random_crop",
-                                    default=False)
+        self.random_crop = retrieve(self.config, "ImageNetValidation/random_crop", default=False)
         if not tdu.is_prepared(self.root):
             # prep
             print("Preparing dataset {} in {}".format(self.NAME, self.root))
@@ -270,6 +274,7 @@ class ImageNetValidation(ImageNetBase):
 
 
 class ImageNetSR(Dataset):
+
     def __init__(self, size=None,
                  degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
                  random_crop=True):
@@ -373,6 +378,7 @@ class ImageNetSR(Dataset):
 
 
 class ImageNetSRTrain(ImageNetSR):
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -384,6 +390,7 @@ class ImageNetSRTrain(ImageNetSR):
 
 
 class ImageNetSRValidation(ImageNetSR):
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
