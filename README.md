@@ -64,7 +64,6 @@ Faster sampling (i.e. even lower values of `ddim_steps`) while retaining good qu
 
 ## Installing on Docker
 
-- Note: depending on CUDA/GPU version, you might have to change the first line in te Dockerfile or change the torch version being installed. 
 - Build the image: `docker build . --tag latent-diffusion`
 - For text-to-image, download the pre-trained weights (5.7GB):
   ```
@@ -73,7 +72,7 @@ Faster sampling (i.e. even lower values of `ddim_steps`) while retaining good qu
   ```
 - Sample with (Make sure to call in the directory of this repo):
   ```
-  docker run --name=tmp-diffusion --rm --gpus all -it -v "$(pwd):/opt/ldm" latent-diffusion /opt/ldm/scripts/txt2img.py --prompt "A large blue whale on a freight ship, vector art" --ddim_eta 0.0 --n_samples 4 --n_iter 4 --scale 5.0 --ddim_steps 50
+  docker run --name=tmp-diffusion --rm --gpus all -it -v "$(pwd):/opt/ldm" latent-diffusion python /opt/ldm/scripts/txt2img.py --prompt "A large blue whale on a freight ship, vector art" --ddim_eta 0.0 --n_samples 4 --n_iter 4 --scale 5.0 --ddim_steps 50
   ```
 
 #### Beyond 256²
