@@ -19,8 +19,8 @@ class DDIMSampler(object):
 
     def __init__(
         self,
-        model: nn.Module,
-        schedule: str = "linear",
+        model:nn.Module,
+        schedule:str="linear",
         **kwargs
     ):
         super().__init__()
@@ -30,8 +30,8 @@ class DDIMSampler(object):
 
     def register_buffer(
         self,
-        name: str,
-        attr: Tensor,
+        name:str,
+        attr:Tensor,
     ):
         if type(attr) == Tensor and attr.device != torch.device("cuda"):
             attr = attr.to(torch.device("cuda"))
@@ -39,10 +39,10 @@ class DDIMSampler(object):
 
     def make_schedule(
         self,
-        ddim_num_steps: int,
-        ddim_discretize: str = "uniform",
-        ddim_eta: float = 0.,
-        verbose: bool = True
+        ddim_num_steps:int,
+        ddim_discretize:str="uniform",
+        ddim_eta:float=0.,
+        verbose:bool=True
     ):
         self.ddim_timesteps = make_ddim_timesteps(
             ddim_discr_method=ddim_discretize,
@@ -81,25 +81,25 @@ class DDIMSampler(object):
     @torch.no_grad()
     def sample(
         self,
-        S: int,
-        batch_size: int,
-        shape: List[int],
-        conditioning: Union[Tensor, Dict] = None,
-        callback: Callable[[int], None] = None,
-        img_callback: Callable[[Tensor, int], None] = None,
-        quantize_x0: bool = False,
-        eta: float = 0.,
-        mask: Tensor = None,
-        x0: Tensor = None,
-        temperature: float = 1.,
-        noise_dropout: float = 0.,
-        score_corrector: Any = None,
-        corrector_kwargs: Dict = None,
-        verbose: bool = True,
-        x_T: Tensor = None,
-        log_every_t: int = 100,
-        unconditional_guidance_scale: float = 1.,
-        unconditional_conditioning: Tensor = None,
+        S:int,
+        batch_size:int,
+        shape:List[int],
+        conditioning:Union[Tensor,Dict]=None,
+        callback:Callable[[int],None]=None,
+        img_callback:Callable[[Tensor,int],None]=None,
+        quantize_x0:bool=False,
+        eta:float=0.,
+        mask:Tensor=None,
+        x0:Tensor=None,
+        temperature:float=1.,
+        noise_dropout:float=0.,
+        score_corrector:Any=None,
+        corrector_kwargs:Dict=None,
+        verbose:bool=True,
+        x_T:Tensor=None,
+        log_every_t:int=100,
+        unconditional_guidance_scale:float=1.,
+        unconditional_conditioning:Tensor=None,
         # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         **kwargs
     ):
@@ -141,23 +141,23 @@ class DDIMSampler(object):
     @torch.no_grad()
     def ddim_sampling(
         self,
-        cond: Tensor,
-        shape: List[int],
-        x_T: Tensor = None,
-        ddim_use_original_steps: bool = False,
-        callback: Callable[[int], None] = None,
-        timesteps: np.ndarray = None,
-        quantize_denoised: bool = False,
-        mask: Tensor = None,
-        x0: Tensor = None,
-        img_callback: Callable[[Tensor, int], None] = None,
-        log_every_t: int = 100,
-        temperature: float = 1.,
-        noise_dropout: float = 0.,
-        score_corrector: Any = None,
-        corrector_kwargs: Dict = None,
-        unconditional_guidance_scale: float = 1.,
-        unconditional_conditioning: Tensor = None,
+        cond:Tensor,
+        shape:List[int],
+        x_T:Tensor=None,
+        ddim_use_original_steps:bool=False,
+        callback:Callable[[int],None]=None,
+        timesteps:np.ndarray=None,
+        quantize_denoised:bool=False,
+        mask:Tensor=None,
+        x0:Tensor=None,
+        img_callback:Callable[[Tensor,int],None]=None,
+        log_every_t:int=100,
+        temperature:float=1.,
+        noise_dropout:float=0.,
+        score_corrector:Any=None,
+        corrector_kwargs:Dict=None,
+        unconditional_guidance_scale:float=1.,
+        unconditional_conditioning:Tensor=None,
     ):
         device = self.model.betas.device
         b = shape[0]
@@ -220,19 +220,19 @@ class DDIMSampler(object):
     @torch.no_grad()
     def p_sample_ddim(
         self,
-        x: Tensor,
-        c: Tensor,
-        t: Tensor,
-        index: int,
-        repeat_noise: bool = False,
-        use_original_steps: bool = False,
-        quantize_denoised: bool = False,
-        temperature: float = 1.,
-        noise_dropout: float = 0.,
-        score_corrector: Any = None,
-        corrector_kwargs: Dict = None,
-        unconditional_guidance_scale: float = 1.,
-        unconditional_conditioning: Tensor = None,
+        x:Tensor,
+        c:Tensor,
+        t:Tensor,
+        index:int,
+        repeat_noise:bool=False,
+        use_original_steps:bool=False,
+        quantize_denoised:bool=False,
+        temperature:float=1.,
+        noise_dropout:float=0.,
+        score_corrector:Any=None,
+        corrector_kwargs:Dict=None,
+        unconditional_guidance_scale:float=1.,
+        unconditional_conditioning:Tensor=None,
     ):
         b, *_, device = *x.shape, x.device
 
