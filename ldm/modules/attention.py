@@ -28,7 +28,7 @@ def max_neg_value(t):
     return -torch.finfo(t.dtype).max
 
 
-def init_(tensor):
+def init_(tensor:Tensor):
     dim = tensor.shape[-1]
     std = 1 / math.sqrt(dim)
     tensor.uniform_(-std, std)
@@ -38,11 +38,11 @@ def init_(tensor):
 # feedforward
 class GEGLU(nn.Module):
 
-    def __init__(self, dim_in: int, dim_out: int):
+    def __init__(self, dim_in:int, dim_out:int):
         super().__init__()
         self.proj = nn.Linear(dim_in, dim_out * 2)
 
-    def forward(self, x: Tensor):
+    def forward(self, x:Tensor):
         x, gate = self.proj(x).chunk(2, dim=-1)
         return x * F.gelu(gate)
 
@@ -51,11 +51,11 @@ class FeedForward(nn.Module):
 
     def __init__(
         self,
-        dim: int,
-        dim_out: int = None,
-        mult: int = 4,
-        glu: bool = False,
-        dropout: float = 0.,
+        dim:int,
+        dim_out:int=None,
+        mult:int=4,
+        glu:bool=False,
+        dropout:float=0.,
     ):
         super().__init__()
         inner_dim = int(dim * mult)
@@ -84,19 +84,19 @@ def zero_module(module):
     return module
 
 
-def Normalize(in_channels: int):
+def Normalize(in_channels:int):
     return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True)
 
 
 class LinearAttention(nn.Module):
-    def __init__(self, dim, heads=4, dim_head=32):
+    def __init__(self, dim:int, heads:int=4, dim_head:int=32):
         super().__init__()
         self.heads = heads
         hidden_dim = dim_head * heads
         self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias = False)
         self.to_out = nn.Conv2d(hidden_dim, dim, 1)
 
-    def forward(self, x):
+    def forward(self, x:Tensor):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads = self.heads, qkv=3)
@@ -109,7 +109,7 @@ class LinearAttention(nn.Module):
 
 class SpatialSelfAttention(nn.Module):
 
-    def __init__(self, in_channels: int):
+    def __init__(self, in_channels:int):
         super().__init__()
         self.in_channels = in_channels
 
@@ -139,7 +139,7 @@ class SpatialSelfAttention(nn.Module):
             stride=1,
             padding=0)
 
-    def forward(self, x):
+    def forward(self, x:Tensor):
         h_ = x
         h_ = self.norm(h_)
         q = self.q(h_)
@@ -169,11 +169,11 @@ class CrossAttention(nn.Module):
 
     def __init__(
         self,
-        query_dim: int,
-        context_dim: int = None,
-        heads: int = 8,
-        dim_head: int = 64,
-        dropout: float = 0.,
+        query_dim:int,
+        context_dim:int=None,
+        heads:int=8,
+        dim_head:int=64,
+        dropout:float=0.,
     ):
         super().__init__()
         inner_dim = dim_head * heads
@@ -191,7 +191,7 @@ class CrossAttention(nn.Module):
             nn.Dropout(dropout)
         )
 
-    def forward(self, x: Tensor, context: Tensor = None, mask: Tensor = None):
+    def forward(self, x:Tensor, context:Tensor=None, mask:Tensor=None):
         h = self.heads
 
         q = self.to_q(x)
@@ -221,13 +221,13 @@ class BasicTransformerBlock(nn.Module):
 
     def __init__(
         self,
-        dim: int,
-        n_heads: int,
-        d_head: int,
-        dropout: float = 0.,
-        context_dim: int = None,
-        gated_ff: bool = True,
-        checkpoint: bool = True,
+        dim:int,
+        n_heads:int,
+        d_head:int,
+        dropout:float=0.,
+        context_dim:int=None,
+        gated_ff:bool=True,
+        checkpoint:bool=True,
     ):
         super().__init__()
         self.attn1 = CrossAttention(
@@ -245,12 +245,12 @@ class BasicTransformerBlock(nn.Module):
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
-        self.checkpoint = checkpoint
+        self.checkpoint=checkpoint
 
-    def forward(self, x: Tensor, context: Tensor = None):
+    def forward(self, x:Tensor, context:Tensor=None):
         return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
 
-    def _forward(self, x: Tensor, context: Tensor = None):
+    def _forward(self, x:Tensor, context:Tensor=None):
         x = self.attn1(self.norm1(x)) + x
         x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
@@ -266,12 +266,12 @@ class SpatialTransformer(nn.Module):
 
     def __init__(
         self,
-        in_channels: int,
-        n_heads: int,
-        d_head: int,
-        depth: int = 1,
-        dropout: float = 0.,
-        context_dim: int = None,
+        in_channels:int,
+        n_heads:int,
+        d_head:int,
+        depth:int=1,
+        dropout:float=0.,
+        context_dim:int=None,
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -297,7 +297,7 @@ class SpatialTransformer(nn.Module):
             stride=1,
             padding=0))
 
-    def forward(self, x: Tensor, context: Tensor = None):
+    def forward(self, x:Tensor, context:Tensor=None):
         # note: if no context is given, cross-attention defaults to self-attention
         b, c, h, w = x.shape
         x_in = x

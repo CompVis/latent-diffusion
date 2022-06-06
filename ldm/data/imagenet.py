@@ -1,4 +1,3 @@
-import albumentations
 import cv2
 import glob
 import os
@@ -8,6 +7,7 @@ import tarfile
 import yaml
 import PIL
 
+import albumentations as al
 import numpy as np
 import taming.data.utils as tdu
 import torchvision.transforms.functional as TF
@@ -272,12 +272,17 @@ class ImageNetValidation(ImageNetBase):
             tdu.mark_prepared(self.root)
 
 
-
 class ImageNetSR(Dataset):
 
-    def __init__(self, size=None,
-                 degradation=None, downscale_f=4, min_crop_f=0.5, max_crop_f=1.,
-                 random_crop=True):
+    def __init__(
+        self,
+        size:int=None,
+        degradation:str=None,
+        downscale_f:int=4,
+        min_crop_f:float=0.5,
+        max_crop_f:float=1.,
+        random_crop:bool=True,
+    ):
         """
         Imagenet Superresolution Dataloader
         Performs following ops in order:
@@ -304,7 +309,7 @@ class ImageNetSR(Dataset):
         assert(max_crop_f <= 1.)
         self.center_crop = not random_crop
 
-        self.image_rescaler = albumentations.SmallestMaxSize(max_size=size, interpolation=cv2.INTER_AREA)
+        self.image_rescaler = al.SmallestMaxSize(max_size=size, interpolation=cv2.INTER_AREA)
 
         self.pil_interpolation = False # gets reset later if incase interp_op is from pillow
 
@@ -316,17 +321,17 @@ class ImageNetSR(Dataset):
 
         else:
             interpolation_fn = {
-            "cv_nearest": cv2.INTER_NEAREST,
-            "cv_bilinear": cv2.INTER_LINEAR,
-            "cv_bicubic": cv2.INTER_CUBIC,
-            "cv_area": cv2.INTER_AREA,
-            "cv_lanczos": cv2.INTER_LANCZOS4,
-            "pil_nearest": PIL.Image.NEAREST,
-            "pil_bilinear": PIL.Image.BILINEAR,
-            "pil_bicubic": PIL.Image.BICUBIC,
-            "pil_box": PIL.Image.BOX,
-            "pil_hamming": PIL.Image.HAMMING,
-            "pil_lanczos": PIL.Image.LANCZOS,
+                "cv_nearest": cv2.INTER_NEAREST,
+                "cv_bilinear": cv2.INTER_LINEAR,
+                "cv_bicubic": cv2.INTER_CUBIC,
+                "cv_area": cv2.INTER_AREA,
+                "cv_lanczos": cv2.INTER_LANCZOS4,
+                "pil_nearest": PIL.Image.NEAREST,
+                "pil_bilinear": PIL.Image.BILINEAR,
+                "pil_bicubic": PIL.Image.BICUBIC,
+                "pil_box": PIL.Image.BOX,
+                "pil_hamming": PIL.Image.HAMMING,
+                "pil_lanczos": PIL.Image.LANCZOS,
             }[degradation]
 
             self.pil_interpolation = degradation.startswith("pil_")
@@ -335,13 +340,14 @@ class ImageNetSR(Dataset):
                 self.degradation_process = partial(TF.resize, size=self.LR_size, interpolation=interpolation_fn)
 
             else:
-                self.degradation_process = albumentations.SmallestMaxSize(max_size=self.LR_size,
-                                                                          interpolation=interpolation_fn)
+                self.degradation_process = al.SmallestMaxSize(
+                    max_size=self.LR_size,
+                    interpolation=interpolation_fn)
 
     def __len__(self):
         return len(self.base)
 
-    def __getitem__(self, i):
+    def __getitem__(self, i:int):
         example = self.base[i]
         image = Image.open(example["file_path_"])
 
@@ -355,10 +361,10 @@ class ImageNetSR(Dataset):
         crop_side_len = int(crop_side_len)
 
         if self.center_crop:
-            self.cropper = albumentations.CenterCrop(height=crop_side_len, width=crop_side_len)
+            self.cropper = al.CenterCrop(height=crop_side_len, width=crop_side_len)
 
         else:
-            self.cropper = albumentations.RandomCrop(height=crop_side_len, width=crop_side_len)
+            self.cropper = al.RandomCrop(height=crop_side_len, width=crop_side_len)
 
         image = self.cropper(image=image)["image"]
         image = self.image_rescaler(image=image)["image"]

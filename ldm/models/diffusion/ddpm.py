@@ -29,12 +29,14 @@ from ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_t
 from ldm.models.diffusion.ddim import DDIMSampler
 
 
-__conditioning_keys__ = {'concat': 'c_concat',
-                         'crossattn': 'c_crossattn',
-                         'adm': 'y'}
+__conditioning_keys__ = {
+    'concat': 'c_concat',
+    'crossattn': 'c_crossattn',
+    'adm': 'y',
+}
 
 
-def disabled_train(self, mode: bool = True):
+def disabled_train(self, mode:bool=True):
     """Overwrite model.train with this function to make sure train/eval mode
     does not change anymore."""
     return self
@@ -51,33 +53,33 @@ class DDPM(pl.LightningModule):
 
     def __init__(
         self,
-        unet_config: Dict,
-        timesteps: int = 1000,
-        beta_schedule: str = "linear",
-        loss_type: str = "l2",
-        ckpt_path: str = None,
-        ignore_keys: List = [],
-        load_only_unet: bool = False,
-        monitor: str = "val/loss",
-        use_ema: bool = True,
-        first_stage_key: str = "image",
-        image_size: int = 256,
-        channels: int = 3,
-        log_every_t: int = 100,
-        clip_denoised: bool = True,
-        linear_start: float = 1e-4,
-        linear_end: float = 2e-2,
-        cosine_s: float = 8e-3,
-        given_betas: List = None,
-        original_elbo_weight: float = 0.,
-        v_posterior: float = 0.,  # weight for choosing posterior variance as sigma = (1-v) * beta_tilde + v * beta
-        l_simple_weight: float = 1.,
-        conditioning_key: str = None,
-        parameterization: str = "eps",  # all assuming fixed variance schedules
-        scheduler_config: Dict = None,
-        use_positional_encodings: bool = False,
-        learn_logvar: bool = False,
-        logvar_init: float = 0.,
+        unet_config:Dict,
+        timesteps:int=1000,
+        beta_schedule:str="linear",
+        loss_type:str="l2",
+        ckpt_path:str=None,
+        ignore_keys:List=[],
+        load_only_unet:bool=False,
+        monitor:str="val/loss",
+        use_ema:bool=True,
+        first_stage_key:str="image",
+        image_size:int=256,
+        channels:int=3,
+        log_every_t:int=100,
+        clip_denoised:bool=True,
+        linear_start:float=1e-4,
+        linear_end:float=2e-2,
+        cosine_s:float=8e-3,
+        given_betas:List=None,
+        original_elbo_weight:float=0.,
+        v_posterior:float=0.,  # weight for choosing posterior variance as sigma = (1-v) * beta_tilde + v * beta
+        l_simple_weight:float=1.,
+        conditioning_key:str=None,
+        parameterization:str="eps",  # all assuming fixed variance schedules
+        scheduler_config:Dict=None,
+        use_positional_encodings:bool=False,
+        learn_logvar:bool=False,
+        logvar_init:float=0.,
     ):
         super().__init__()
         assert parameterization in ["eps", "x0"], 'currently only supporting "eps" and "x0"'
@@ -132,12 +134,12 @@ class DDPM(pl.LightningModule):
 
     def register_schedule(
         self,
-        given_betas: List = None,
-        beta_schedule: str = "linear",
-        timesteps: int = 1000,
-        linear_start: float = 1e-4,
-        linear_end: float = 2e-2,
-        cosine_s: float = 8e-3,
+        given_betas:List=None,
+        beta_schedule:str="linear",
+        timesteps:int=1000,
+        linear_start:float=1e-4,
+        linear_end:float=2e-2,
+        cosine_s:float=8e-3,
     ):
         if exists(given_betas):
             betas = given_betas
@@ -194,7 +196,7 @@ class DDPM(pl.LightningModule):
         assert not torch.isnan(self.lvlb_weights).all()
 
     @contextmanager
-    def ema_scope(self, context: str = None):
+    def ema_scope(self, context:str=None):
         if self.use_ema:
             self.model_ema.store(self.model.parameters())
             self.model_ema.copy_to(self.model)
@@ -253,7 +255,7 @@ class DDPM(pl.LightningModule):
         posterior_log_variance_clipped = extract_into_tensor(self.posterior_log_variance_clipped, t, x_t.shape)
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
-    def p_mean_variance(self, x, t, clip_denoised: bool):
+    def p_mean_variance(self, x, t, clip_denoised:bool):
         model_out = self.model(x, t)
         if self.parameterization == "eps":
             x_recon = self.predict_start_from_noise(x, t=t, noise=model_out)
@@ -296,12 +298,12 @@ class DDPM(pl.LightningModule):
         return self.p_sample_loop((batch_size, channels, image_size, image_size),
                                   return_intermediates=return_intermediates)
 
-    def q_sample(self, x_start: Tensor, t: Tensor, noise: Tensor = None):
+    def q_sample(self, x_start:Tensor, t:Tensor, noise:Tensor=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
         return (extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start +
                 extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise)
 
-    def get_loss(self, pred: Tensor, target: Tensor, mean: bool = True):
+    def get_loss(self, pred:Tensor, target:Tensor, mean:bool=True):
         if self.loss_type == 'l1':
             loss = (target - pred).abs()
             if mean:
@@ -321,7 +323,7 @@ class DDPM(pl.LightningModule):
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         model_out = self.model(x_noisy, t)
 
-        loss_dict = {}
+        loss_dict={}
         if self.parameterization == "eps":
             target = noise
         elif self.parameterization == "x0":
@@ -351,7 +353,7 @@ class DDPM(pl.LightningModule):
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         return self.p_losses(x, t, *args, **kwargs)
 
-    def get_input(self, batch: Tensor, k: str):
+    def get_input(self, batch:Tensor, k:str):
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
@@ -359,13 +361,13 @@ class DDPM(pl.LightningModule):
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
-    def shared_step(self, batch: Dict):
+    def shared_step(self, batch:Dict):
         x = self.get_input(batch, self.first_stage_key)
-        loss, loss_dict = self(x)
+        loss, loss_dict=self(x)
         return loss, loss_dict
 
-    def training_step(self, batch: Dict, batch_idx: int):
-        loss, loss_dict = self.shared_step(batch)
+    def training_step(self, batch:Dict, batch_idx:int):
+        loss, loss_dict=self.shared_step(batch)
         self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
         self.log("global_step", self.global_step, prog_bar=True, logger=True, on_step=True, on_epoch=False)
 
@@ -376,7 +378,7 @@ class DDPM(pl.LightningModule):
         return loss
 
     @torch.no_grad()
-    def validation_step(self, batch: Dict, batch_idx: int):
+    def validation_step(self, batch:Dict, batch_idx:int):
         _, loss_dict_no_ema = self.shared_step(batch)
         with self.ema_scope():
             _, loss_dict_ema = self.shared_step(batch)
@@ -447,16 +449,16 @@ class LatentDiffusion(DDPM):
     """main class"""
     def __init__(
         self,
-        first_stage_config: Dict,
-        cond_stage_config: Dict,
-        num_timesteps_cond: int = None,
-        cond_stage_key: str = "image",
-        cond_stage_trainable: bool = False,
-        concat_mode: bool = True,
-        cond_stage_forward: bool = None,
-        conditioning_key: str = None,
-        scale_factor: float = 1.0,
-        scale_by_std: bool = False,
+        first_stage_config:Dict,
+        cond_stage_config:Dict,
+        num_timesteps_cond:int=None,
+        cond_stage_key:str="image",
+        cond_stage_trainable:bool=False,
+        concat_mode:bool=True,
+        cond_stage_forward:bool=None,
+        conditioning_key:str=None,
+        scale_factor:float=1.0,
+        scale_by_std:bool=False,
         *args,
         **kwargs
     ):
@@ -503,7 +505,7 @@ class LatentDiffusion(DDPM):
 
     @rank_zero_only
     @torch.no_grad()
-    def on_train_batch_start(self, batch: Dict, batch_idx: int):
+    def on_train_batch_start(self, batch:Dict, batch_idx:int):
         # only for very first batch
         if self.scale_by_std and self.current_epoch == 0 and self.global_step == 0 and batch_idx == 0 and not self.restarted_from_ckpt:
             assert self.scale_factor == 1., 'rather not use custom rescaling and std-rescaling simultaneously'
@@ -520,12 +522,12 @@ class LatentDiffusion(DDPM):
 
     def register_schedule(
         self,
-        given_betas: List = None,
-        beta_schedule: str = "linear",
-        timesteps: int = 1000,
-        linear_start: float = 1e-4,
-        linear_end: float = 2e-2,
-        cosine_s: float = 8e-3,
+        given_betas:List=None,
+        beta_schedule:str="linear",
+        timesteps:int=1000,
+        linear_start:float=1e-4,
+        linear_end:float=2e-2,
+        cosine_s:float=8e-3,
     ):
         super().register_schedule(
             given_betas,
@@ -579,7 +581,7 @@ class LatentDiffusion(DDPM):
         denoise_grid = make_grid(denoise_grid, nrow=n_imgs_per_row)
         return denoise_grid
 
-    def get_first_stage_encoding(self, encoder_posterior: Tensor):
+    def get_first_stage_encoding(self, encoder_posterior:Tensor):
         if isinstance(encoder_posterior, DiagonalGaussianDistribution):
             z = encoder_posterior.sample()
         elif isinstance(encoder_posterior, torch.Tensor):
@@ -588,7 +590,7 @@ class LatentDiffusion(DDPM):
             raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c: Tensor):
+    def get_learned_conditioning(self, c:Tensor):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
                 c = self.cond_stage_model.encode(c)
@@ -601,13 +603,13 @@ class LatentDiffusion(DDPM):
             c = getattr(self.cond_stage_model, self.cond_stage_forward)(c)
         return c
 
-    def meshgrid(self, h: int, w: int):
+    def meshgrid(self, h:int, w:int):
         y = torch.arange(0, h).view(h, 1, 1).repeat(1, w, 1)
         x = torch.arange(0, w).view(1, w, 1).repeat(h, 1, 1)
         arr = torch.cat([y, x], dim=-1)
         return arr
 
-    def delta_border(self, h: int, w: int):
+    def delta_border(self, h:int, w:int):
         """
         :param h: height
         :param w: width
@@ -623,11 +625,11 @@ class LatentDiffusion(DDPM):
 
     def get_weighting(
         self,
-        h: int,
-        w: int,
-        Ly: int,
-        Lx: int,
-        device: torch.device,
+        h:int,
+        w:int,
+        Ly:int,
+        Lx:int,
+        device:torch.device,
     ):
         weighting = self.delta_border(h, w)
         weighting = torch.clip(
@@ -649,11 +651,11 @@ class LatentDiffusion(DDPM):
 
     def get_fold_unfold(
         self,
-        x: Tensor,
-        kernel_size: Tuple,
-        stride: Tuple,
-        uf: int = 1,
-        df: int = 1,
+        x:Tensor,
+        kernel_size:Tuple,
+        stride:Tuple,
+        uf:int=1,
+        df:int=1,
     ):  # todo load once not every time, shorten code
         """
         :param x: img of size (bs, c, h, w)
@@ -707,13 +709,13 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def get_input(
         self,
-        batch: Tensor,
-        k: str,
-        return_first_stage_outputs: bool = False,
-        force_c_encode: bool = False,
-        cond_key: str = None,
-        return_original_cond: bool = False,
-        bs: int = None,
+        batch:Tensor,
+        k:str,
+        return_first_stage_outputs:bool=False,
+        force_c_encode:bool=False,
+        cond_key:str=None,
+        return_original_cond:bool=False,
+        bs:int=None,
     ):
         x = super().get_input(batch, k)
         if bs is not None:
@@ -767,9 +769,9 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def decode_first_stage(
         self,
-        z: Tensor,
-        predict_cids: bool = False,
-        force_not_quantize: bool = False,
+        z:Tensor,
+        predict_cids:bool=False,
+        force_not_quantize:bool=False,
     ):
         if predict_cids:
             if z.dim() == 4:
@@ -888,7 +890,7 @@ class LatentDiffusion(DDPM):
                 return self.first_stage_model.decode(z)
 
     @torch.no_grad()
-    def encode_first_stage(self, x: Tensor):
+    def encode_first_stage(self, x:Tensor):
         if hasattr(self, "split_input_params"):
             if self.split_input_params["patch_distributed_vq"]:
                 ks = self.split_input_params["ks"]  # eg. (128, 128)
@@ -926,12 +928,12 @@ class LatentDiffusion(DDPM):
         else:
             return self.first_stage_model.encode(x)
 
-    def shared_step(self, batch: Dict, **kwargs):
+    def shared_step(self, batch:Dict, **kwargs):
         x, c = self.get_input(batch, self.first_stage_key)
         loss = self(x, c)
         return loss
 
-    def forward(self, x: Tensor, c: Union[Tensor, Dict], *args, **kwargs):
+    def forward(self, x:Tensor, c:Union[Tensor,Dict], *args, **kwargs):
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         if self.model.conditioning_key is not None:
             assert c is not None
@@ -954,10 +956,10 @@ class LatentDiffusion(DDPM):
 
     def apply_model(
         self,
-        x_noisy: Tensor,
-        t: Tensor,
-        cond: Tensor,
-        return_ids: bool = False,
+        x_noisy:Tensor,
+        t:Tensor,
+        cond:Tensor,
+        return_ids:bool=False,
     ):
         if isinstance(cond, dict):
             # hybrid case, cond is exptected to be a dict
@@ -1075,12 +1077,12 @@ class LatentDiffusion(DDPM):
         kl_prior = normal_kl(mean1=qt_mean, logvar1=qt_log_variance, mean2=0.0, logvar2=0.0)
         return mean_flat(kl_prior) / np.log(2.0)
 
-    def p_losses(self, x_start: Tensor, cond: Tensor, t: Tensor, noise: Tensor = None):
+    def p_losses(self, x_start:Tensor, cond:Tensor, t:Tensor, noise:Tensor=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         model_output = self.apply_model(x_noisy, t, cond)
 
-        loss_dict = {}
+        loss_dict={}
         prefix = 'train' if self.training else 'val'
 
         if self.parameterization == "x0":
@@ -1110,7 +1112,7 @@ class LatentDiffusion(DDPM):
 
         return loss, loss_dict
 
-    def p_mean_variance(self, x, c, t, clip_denoised: bool, return_codebook_ids=False, quantize_denoised=False,
+    def p_mean_variance(self, x, c, t, clip_denoised:bool, return_codebook_ids=False, quantize_denoised=False,
                         return_x0=False, score_corrector=None, corrector_kwargs=None):
         t_in = t
         model_out = self.apply_model(x, t_in, c, return_ids=return_codebook_ids)
@@ -1317,17 +1319,17 @@ class LatentDiffusion(DDPM):
     def log_images(
         self,
         batch: Dict,
-        N: int = 8,
-        n_row: int = 4,
-        sample: bool = True,
-        ddim_steps: int = 200,
-        ddim_eta: float = 1.,
+        N:int=8,
+        n_row:int=4,
+        sample:bool=True,
+        ddim_steps:int=200,
+        ddim_eta:float=1.,
         return_keys: List = None,
-        quantize_denoised: bool = True,
-        inpaint: bool = True,
-        plot_denoise_rows: bool = False,
-        plot_progressive_rows: bool = True,
-        plot_diffusion_rows: bool = True,
+        quantize_denoised:bool=True,
+        inpaint:bool=True,
+        plot_denoise_rows:bool=False,
+        plot_progressive_rows:bool=True,
+        plot_diffusion_rows:bool=True,
         **kwargs,
     ):
 
@@ -1495,8 +1497,8 @@ class DiffusionWrapper(pl.LightningModule):
 
     def __init__(
         self,
-        diff_model_config: Dict,
-        conditioning_key: str,
+        diff_model_config:Dict,
+        conditioning_key:str,
     ):
         super().__init__()
         self.diffusion_model = instantiate_from_config(diff_model_config)
@@ -1505,10 +1507,10 @@ class DiffusionWrapper(pl.LightningModule):
 
     def forward(
         self,
-        x: Tensor,
-        t: Tensor,
-        c_concat: list = None,
-        c_crossattn: list = None,
+        x:Tensor,
+        t:Tensor,
+        c_concat:list=None,
+        c_crossattn:list=None,
     ):
         if self.conditioning_key is None:
             out = self.diffusion_model(x, t)
