@@ -37,10 +37,10 @@ class AttentionPool2d(nn.Module):
 
     def __init__(
         self,
-        spacial_dim: int,
-        embed_dim: int,
-        num_heads_channels: int,
-        output_dim: int = None,
+        spacial_dim:int,
+        embed_dim:int,
+        num_heads_channels:int,
+        output_dim:int=None,
     ):
         super().__init__()
         self.positional_embedding = nn.Parameter(th.randn(embed_dim, spacial_dim ** 2 + 1) / embed_dim ** 0.5)
@@ -78,7 +78,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     support it as an extra input.
     """
 
-    def forward(self, x: Tensor, emb: Tensor, context: Tensor = None):
+    def forward(self, x:Tensor, emb:Tensor, context:Tensor=None):
         for layer in self:
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
@@ -100,11 +100,11 @@ class Upsample(nn.Module):
 
     def __init__(
         self,
-        channels: int,
-        use_conv: bool,
-        dims: int = 2,
-        out_channels: int = None,
-        padding: int = 1,
+        channels:int,
+        use_conv:bool,
+        dims:int=2,
+        out_channels:int=None,
+        padding:int=1,
     ):
         super().__init__()
         self.channels = channels
@@ -114,7 +114,7 @@ class Upsample(nn.Module):
         if use_conv:
             self.conv = conv_nd(dims, self.channels, self.out_channels, 3, padding=padding)
 
-    def forward(self, x: Tensor):
+    def forward(self, x:Tensor):
         assert x.shape[1] == self.channels
         if self.dims == 3:
             x = F.interpolate(
@@ -154,11 +154,11 @@ class Downsample(nn.Module):
 
     def __init__(
         self,
-        channels: int,
-        use_conv: bool,
-        dims: int = 2,
-        out_channels: int = None,
-        padding: int = 1,
+        channels:int,
+        use_conv:bool,
+        dims:int=2,
+        out_channels:int=None,
+        padding:int=1,
     ):
         super().__init__()
         self.channels = channels
@@ -174,7 +174,7 @@ class Downsample(nn.Module):
             assert self.channels == self.out_channels
             self.op = avg_pool_nd(dims, kernel_size=stride, stride=stride)
 
-    def forward(self, x: Tensor):
+    def forward(self, x:Tensor):
         assert x.shape[1] == self.channels
         return self.op(x)
 
@@ -197,16 +197,16 @@ class ResBlock(TimestepBlock):
 
     def __init__(
         self,
-        channels: int,
-        emb_channels: int,
-        dropout: float,
-        out_channels: int = None,
-        use_conv: bool = False,
-        use_scale_shift_norm: bool = False,
-        dims: int = 2,
-        use_checkpoint: bool = False,
-        up: bool = False,
-        down: bool = False,
+        channels:int,
+        emb_channels:int,
+        dropout:float,
+        out_channels:int=None,
+        use_conv:bool=False,
+        use_scale_shift_norm:bool=False,
+        dims:int=2,
+        use_checkpoint:bool=False,
+        up:bool=False,
+        down:bool=False,
     ):
         super().__init__()
         self.channels = channels
@@ -257,7 +257,7 @@ class ResBlock(TimestepBlock):
         else:
             self.skip_connection = conv_nd(dims, channels, self.out_channels, 1)
 
-    def forward(self, x: Tensor, emb: Tensor):
+    def forward(self, x:Tensor, emb:Tensor):
         """
         Apply the block to a Tensor, conditioned on a timestep embedding.
         :param x: an [N x C x ...] Tensor of features.
@@ -269,7 +269,7 @@ class ResBlock(TimestepBlock):
         )
 
 
-    def _forward(self, x: Tensor, emb: Tensor):
+    def _forward(self, x:Tensor, emb:Tensor):
         if self.updown:
             in_rest, in_conv = self.in_layers[:-1], self.in_layers[-1]
             h = in_rest(x)
@@ -301,11 +301,11 @@ class AttentionBlock(nn.Module):
 
     def __init__(
         self,
-        channels: int,
-        num_heads: int = 1,
-        num_head_channels: int = -1,
-        use_checkpoint: bool = False,
-        use_new_attention_order: bool = False,
+        channels:int,
+        num_heads:int=1,
+        num_head_channels:int=-1,
+        use_checkpoint:bool=False,
+        use_new_attention_order:bool=False,
     ):
         super().__init__()
         self.channels = channels
@@ -328,10 +328,10 @@ class AttentionBlock(nn.Module):
 
         self.proj_out = zero_module(conv_nd(1, channels, channels, 1))
 
-    def forward(self, x: Tensor):
+    def forward(self, x:Tensor):
         return checkpoint(self._forward, (x,), self.parameters(), True)   # TODO: check checkpoint usage, is True # TODO: fix the .half call!!!
 
-    def _forward(self, x: Tensor):
+    def _forward(self, x:Tensor):
         b, c, *spatial = x.shape
         x = x.reshape(b, c, -1)
         qkv = self.qkv(self.norm(x))
@@ -365,11 +365,11 @@ class QKVAttentionLegacy(nn.Module):
     A module which performs QKV attention. Matches legacy QKVAttention + input/ouput heads shaping
     """
 
-    def __init__(self, n_heads: int):
+    def __init__(self, n_heads:int):
         super().__init__()
         self.n_heads = n_heads
 
-    def forward(self, qkv: Tensor):
+    def forward(self, qkv:Tensor):
         """
         Apply QKV attention.
         :param qkv: an [N x (H * 3 * C) x T] tensor of Qs, Ks, and Vs.
@@ -456,30 +456,30 @@ class UNetModel(nn.Module):
 
     def __init__(
         self,
-        image_size: int,
-        in_channels: int,
-        model_channels: int,
-        out_channels: int,
-        num_res_blocks: int,
-        attention_resolutions: List[int],
-        dropout: float = 0,
-        channel_mult: Tuple = (1, 2, 4, 8),
-        conv_resample: bool = True,
-        dims: int = 2,
-        num_classes: int = None,
-        use_checkpoint: bool = False,
-        use_fp16: bool = False,
-        num_heads: int = -1,
-        num_head_channels: int = -1,
-        num_heads_upsample: int = -1,
-        use_scale_shift_norm: bool = False,
-        resblock_updown: bool = False,
-        use_new_attention_order: bool = False,
-        use_spatial_transformer: bool = False,      # custom transformer support
-        transformer_depth: int = 1,                 # custom transformer support
-        context_dim: Union[int, ListConfig] = None, # custom transformer support
-        n_embed: int = None,                        # custom support for prediction of discrete ids into codebook of first stage vq model
-        legacy: bool = True,
+        image_size:int,
+        in_channels:int,
+        model_channels:int,
+        out_channels:int,
+        num_res_blocks:int,
+        attention_resolutions:List[int],
+        dropout:float=0,
+        channel_mult:Tuple=(1,2,4,8),
+        conv_resample:bool=True,
+        dims:int=2,
+        num_classes:int=None,
+        use_checkpoint:bool=False,
+        use_fp16:bool=False,
+        num_heads:int=-1,
+        num_head_channels:int=-1,
+        num_heads_upsample:int=-1,
+        use_scale_shift_norm:bool=False,
+        resblock_updown:bool=False,
+        use_new_attention_order:bool=False,
+        use_spatial_transformer:bool=False,         # custom transformer support
+        transformer_depth:int=1,                    # custom transformer support
+        context_dim:Union[int,ListConfig]=None,     # custom transformer support
+        n_embed:int=None,                           # custom support for prediction of discrete ids into codebook of first stage vq model
+        legacy:bool=True,
     ):
         super().__init__()
         if use_spatial_transformer:
@@ -741,10 +741,10 @@ class UNetModel(nn.Module):
 
     def forward(
         self,
-        x: Tensor,
-        timesteps: Tensor = None,
-        context: Tensor =None,
-        y: Tensor = None,
+        x:Tensor,
+        timesteps:Tensor=None,
+        context:Tensor=None,
+        y:Tensor=None,
         **kwargs
     ):
         """
