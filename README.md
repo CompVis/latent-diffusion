@@ -20,6 +20,9 @@
 </p>
 
 ## News
+
+### July 2022
+- Inference code and model weights to run our [retrieval-augmented diffusion models](https://arxiv.org/abs/2204.11824) are now available. See ##RDM.
 ### April 2022
 - Thanks to [Katherine Crowson](https://github.com/crowsonkb), classifier-free guidance received a ~2x speedup and the [PLMS sampler](https://arxiv.org/abs/2202.09778) is available. See also [this PR](https://github.com/CompVis/latent-diffusion/pull/51).
 
@@ -41,6 +44,49 @@ conda activate ldm
 # Pretrained Models
 A general list of all available checkpoints is available in via our [model zoo](#model-zoo).
 If you use any of these models in your work, we are always happy to receive a [citation](#bibtex).
+
+## Retrieval Augmented Diffusion Models (WIP)
+![rdm-figure](assets/rdm-preview.jpg)
+We include inference code to run our retrieval-augmented diffusion models (RDMs) as described in [https://arxiv.org/abs/2204.11824](https://arxiv.org/abs/2204.11824).
+
+To get started, download the weights:
+```bash
+mkdir -p models/rdm/rdm768x768
+wget -O models/rdm/rdm768x768/model.ckpt TODO
+wget -O models/rdm/rdm768x768/config.yaml TODO
+```
+As these models are conditioned on a set of CLIP image embeddings, our RDMs support different inference modes, 
+which are described in the following.
+#### RDM with text-prompt only (no explicit retrieval needed)
+Since CLIP offers a shared image/text feature space, and RDMs learn to cover a neighborhood of a given
+example during training, we can directly take a CLIP text embedding of a given prompt and condition on it.
+Run this mode via
+```
+python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on canvas"
+```
+
+#### RDM with text-to-image retrieval
+Download the retrieval-databases which contain the retrieval-datasets (OpenImages and ArtBench) compressed into CLIP image embeddings:
+```bash
+mkdir -p data/rdm/openimages
+mkdir -p data/rdm/artbench
+wget -O data/rdm/openimages/data.p TODO
+wget -O data/rdm/artbench/data.p TODO
+```
+We also provide trained [ScaNN]()/[faiss]() search indices [here](TODO). Download via
+```bash
+wget -O data/rdm/openimages/searcher.p TODO
+wget -O data/rdm/artbench/searcher TODO
+```
+
+
+
+#### RDM with image-to-image retrieval (maybe?, TODO)
+- simple modification of above section, support image encoding
+
+#### Coming Soon
+- better models
+- more resolutions
 
 ## Text-to-Image
 ![text2img-figure](assets/txt2img-preview.png) 
