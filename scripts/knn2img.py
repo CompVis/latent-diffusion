@@ -9,16 +9,29 @@ from tqdm import tqdm, trange
 from itertools import islice
 from einops import rearrange, repeat
 from torchvision.utils import make_grid
+import scann
+import time
+from multiprocessing import cpu_count
 
-from ldm.util import instantiate_from_config
+
+from ldm.util import instantiate_from_config, parallel_data_prefetch
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
+from ldm.modules.encoders.modules import FrozenClipImageEmbedder, FrozenCLIPTextEmbedder
 
 
 DATABASES = [
     "openimages",
+    "artbench-art_nouveau",
+    "artbench-baroque",
+    "artbench-expressionism",
+    "artbench-impressionism",
+    "artbench-post_impressionism",
+    "artbench-realism",
+    "artbench-romanticism",
+    "artbench-renaissance",
     "artbench-surrealism",
-    # etc TODO: add
+    "artbench-ukiyo_e",
 ]
 
 
@@ -48,61 +61,113 @@ def load_model_from_config(config, ckpt, verbose=False):
 
 
 class Searcher(object):
-    # TODO
-    def __init__(self, database, searcher):
+    def __init__(self, database, retriever_version='ViT-L/14'):
         assert database in DATABASES
-        self.database = self.load_database(database)
+        # self.database = self.load_database(database)
+        self.database_name = database
+        self.searcher_savedir = f'models/searchers/{self.database_name}'
+        self.database_path = f'data/retrieval_databases/{self.database_name}'
+        self.retriever = self.load_retriever(version=retriever_version)
+        self.database = {'embedding': [],
+                          'img_id': [],
+                          'patch_coords': []}
+        self.load_database()
         self.searcher = self.load_searcher()
 
-    def load_database(self, path):
-        # TODO
-        return
+    def train_searcher(self, k,
+                       metric='dot_product',
+                       searcher_savedir=None):
 
-    def load_searcher(self, path):
-        # TODO
-        return
+        print('Start training searcher')
+        searcher = scann.scann_ops_pybind.builder(self.database['embedding'] /
+                                                  np.linalg.norm(self.database['embedding'], axis=1)[:, np.newaxis],
+                                                  k, metric)
+        self.searcher = searcher.score_brute_force().build()
+        print('Finish training searcher')
 
-    def search(self, x, n):
-        # returns the n closest neighbors in self.database
-        nns = ... # TODO
-        return nnns
+        if searcher_savedir is not None:
+            print(f'Save trained searcher under "{searcher_savedir}"')
+            os.makedirs(searcher_savedir, exist_ok=True)
+            self.searcher.serialize(searcher_savedir)
+
+    def load_single_file(self, saved_embeddings):
+        compressed = np.load(saved_embeddings)
+        self.database = {key: compressed[key] for key in compressed.files}
+        print('Finished loading of clip embeddings.')
+
+    def load_multi_files(self, data_archive):
+        out_data = {key: [] for key in self.database}
+        for d in tqdm(data_archive, desc=f'Loading datapool from {len(data_archive)} individual files.'):
+            for key in d.files:
+                out_data[key].append(d[key])
+
+        return out_data
+
+    def load_database(self):
+
+
+        print(f'Load saved patch embedding from "{self.database_path}"')
+        file_content = glob.glob(os.path.join(self.database_path,'*.npz'))
+
+
+        if len(file_content) == 1:
+            self.load_single_file(file_content[0])
+        elif len(file_content) > 1:
+            data = [np.load(f) for f in file_content]
+            prefetched_data = parallel_data_prefetch(self.load_multi_files, data,
+                                                     n_proc=min(len(data), cpu_count()), target_data_type='dict')
+
+            self.database = {key: np.concatenate([od[key] for od in prefetched_data], axis=1)[0] for key in self.data_pool}
+        else:
+            raise ValueError(f'No npz-files in specified path "{self.database_path}" is this directory existing?')
+
+        print(f'Finished loading of retrieval database of length {self.database["embedding"].shape[0]}.')
+
+
+    def load_retriever(self,version='ViT-L/14',):
+
+        model = FrozenClipImageEmbedder(model=version)
+        if torch.cuda.is_available():
+            model.cuda()
+        model.eval()
+        return model
+
+    def load_searcher(self):
+        print(f'load searcher for database {self.database_name} from {self.searcher_savedir}')
+        self.searcher = scann.scann_ops_pybind.load_searcher(self.searcher_savedir)
+        print('Finished loading searcher.')
+
+
+    def search(self, x, k):
+        if self.searcher is None and self.database['embedding'].shape[0] < 2e4:
+            self.train_searcher(k)
+        assert self.searcher is not None, 'Cannot search with uninitialized searcher'
+        if isinstance(x,torch.Tensor):
+            x = x.detach().cpu().numpy()
+        if len(x.shape) == 3:
+            x = x[:,0]
+        query_embeddings = x / np.linalg.norm(x, axis=1)[:, np.newaxis]
+
+        start = time.time()
+        nns, distances = self.searcher.search_batched(query_embeddings, final_num_neighbors=k)
+        end = time.time()
+
+        out_embeddings = self.database['embedding'][nns]
+        out_img_ids = self.database['img_id'][nns]
+        out_pc = self.database['patch_coords'][nns]
+
+        out = {'nn_embeddings': out_embeddings / np.linalg.norm(out_embeddings, axis=-1)[..., np.newaxis],
+               'img_ids': out_img_ids,
+               'patch_coords': out_pc,
+               'queries': x,
+               'exec_time': end - start,
+               'nns': nns,
+               'q_embeddings': query_embeddings}
+
+        return out
 
     def __call__(self, x, n):
         return self.search(x, n)
-
-
-class FrozenCLIPTextEmbedder(nn.Module):
-    """
-    Uses the CLIP transformer encoder for text.
-    TODO: add image encoder for image-based prompting
-    """
-    def __init__(self, version='ViT-L/14', device="cuda", max_length=77, n_repeat=1, normalize=True):
-        super().__init__()
-        self.model, _ = clip.load(version, jit=False, device="cpu")
-        self.device = device
-        self.max_length = max_length
-        self.n_repeat = n_repeat
-        self.normalize = normalize
-
-    def freeze(self):
-        self.model = self.model.eval()
-        for param in self.parameters():
-            param.requires_grad = False
-
-    def forward(self, text):
-        tokens = clip.tokenize(text).to(self.device)
-        z = self.model.encode_text(tokens)
-        if self.normalize:
-            z = z / torch.linalg.norm(z, dim=1, keepdim=True)
-        return z
-
-    def encode(self, text):
-        z = self(text)
-        if z.ndim==2:
-            z = z[:, None, :]
-        z = repeat(z, 'b 1 d -> b k d', k=self.n_repeat)
-        return z
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -223,6 +288,26 @@ if __name__ == "__main__":
         default="ViT-L/14",
         help="which CLIP model to use for retrieval and NN encoding",
     )
+    parser.add_argument(
+        "--database",
+        type=str,
+        default=DATABASES[0],
+        choices=DATABASES,
+        help="The database used for the search",
+    )
+    parser.add_argument(
+        "--use_neighbors",
+        default=False,
+        action='store_true',
+        help="Include neighbors in addition to text prompt for conditioning",
+    )
+    parser.add_argument(
+        "--knn",
+        default=10,
+        type=int,
+        help="The number of included neighbors, only applied when --use_neighbors=True",
+    )
+
 
     opt = parser.parse_args()
 
@@ -262,6 +347,10 @@ if __name__ == "__main__":
     
     print(f"sampling scale for cfg is {opt.scale:.2f}")
 
+    searcher = None
+    if opt.use_neighbors:
+        searcher = Searcher(opt.database)
+
     with torch.no_grad():
         with model.ema_scope():
             for n in trange(opt.n_iter, desc="Sampling"):
@@ -271,7 +360,10 @@ if __name__ == "__main__":
                     if isinstance(prompts, tuple):
                         prompts = list(prompts)
                     c = clip_text_encoder.encode(prompts)
-                    uc = None
+                    if searcher is not None:
+                        nn_dict = searcher(c,opt.knn)
+                        c = torch.cat([c,torch.from_numpy(nn_dict['nn_embeddings']).cuda()],dim=1)
+                        uc = None
                     if opt.scale != 1.0:
                         uc = torch.zeros_like(c)
                     if isinstance(prompts, tuple):
