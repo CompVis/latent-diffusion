@@ -72,7 +72,7 @@ class Searcher(object):
                           'img_id': [],
                           'patch_coords': []}
         self.load_database()
-        self.searcher = self.load_searcher()
+        self.load_searcher()
 
     def train_searcher(self, k,
                        metric='dot_product',
@@ -117,7 +117,7 @@ class Searcher(object):
             prefetched_data = parallel_data_prefetch(self.load_multi_files, data,
                                                      n_proc=min(len(data), cpu_count()), target_data_type='dict')
 
-            self.database = {key: np.concatenate([od[key] for od in prefetched_data], axis=1)[0] for key in self.data_pool}
+            self.database = {key: np.concatenate([od[key] for od in prefetched_data], axis=1)[0] for key in self.database}
         else:
             raise ValueError(f'No npz-files in specified path "{self.database_path}" is this directory existing?')
 
