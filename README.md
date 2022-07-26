@@ -84,7 +84,7 @@ We also provide trained [ScaNN]() search indices [here](TODO). Download and extr
 ```bash
 mkdir -p data/rdm/searchers
 wget -O data/rdm/searchers/artbench.zip https://ommer-lab.com/files/rdm/artbench_searchers.zip
-wget -O data/rdm/searchers/openimages.zip https://ommer-lab.com/files/rdm/openimages_searcher.zip
+wget -O data/rdm/searchers/openimages.zip https://ommer-lab.com/files/rdm/openimages_searcher.zip TODO not yet uploaded
 unzip data/rdm/searchers/artbench.zip -d data/rdm/searchers
 unzip data/rdm/searchers/openimages.zip -d data/rdm/searchers
 
