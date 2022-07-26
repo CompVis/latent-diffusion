@@ -100,12 +100,12 @@ python scripts/train_searcher.py
 
 Retrieval based text-guided sampling with visual nearest neighbors can be started via 
 ```
-python scripts/knn2img.py  --prompt "a happy bear reading a newspaper" --use_neighbors --knn <number_of_neighbors> 
+python scripts/knn2img.py  --prompt "a happy pineapple" --use_neighbors --knn <number_of_neighbors> 
 ```
 Note that the maximum supported number of neighbors is 20. 
 The database can be changed via the cmd parameter ``--database`` which can be `[openimages, artbench-art_nouveau, artbench-baroque, artbench-expressionism, artbench-impressionism, artbench-post_impressionism, artbench-realism, artbench-renaissance, artbench-romanticism, artbench-surrealism, artbench-ukiyo_e]`.
 For using `--database openimages`, the above script (`scripts/train_searcher.py`) must be executed before.
-
+Due to their relatively small size, the artbench datasetbases are best suited for creating more abstract concepts and do not work well for detailed text control. 
 
 
 #### Coming Soon

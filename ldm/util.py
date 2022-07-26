@@ -45,7 +45,7 @@ def ismap(x):
 
 
 def isimage(x):
-    if not isinstance(x,torch.Tensor):
+    if not isinstance(x, torch.Tensor):
         return False
     return (len(x.shape) == 4) and (x.shape[1] == 3 or x.shape[1] == 1)
 
@@ -71,7 +71,7 @@ def mean_flat(tensor):
 def count_params(model, verbose=False):
     total_params = sum(p.numel() for p in model.parameters())
     if verbose:
-        print(f"{model.__class__.__name__} has {total_params*1.e-6:.2f} M params.")
+        print(f"{model.__class__.__name__} has {total_params * 1.e-6:.2f} M params.")
     return total_params
 
 
@@ -92,12 +92,13 @@ def get_obj_from_str(string, reload=False):
         importlib.reload(module_imp)
     return getattr(importlib.import_module(module, package=None), cls)
 
+
 def _do_parallel_data_prefetch(func, Q, data, idx, idx_to_fn=False):
     # create dummy dataset instance
 
     # run prefetching
     if idx_to_fn:
-        res = func(data,worker_id=idx)
+        res = func(data, worker_id=idx)
     else:
         res = func(data)
     Q.put([idx, res])
@@ -105,7 +106,7 @@ def _do_parallel_data_prefetch(func, Q, data, idx, idx_to_fn=False):
 
 
 def parallel_data_prefetch(
-    func: callable, data, n_proc, target_data_type="ndarray",cpu_intensive=True,use_worker_id=False
+        func: callable, data, n_proc, target_data_type="ndarray", cpu_intensive=True, use_worker_id=False
 ):
     # if target_data_type not in ["ndarray", "list"]:
     #     raise ValueError(
@@ -149,7 +150,7 @@ def parallel_data_prefetch(
         arguments = [
             [func, Q, part, i, use_worker_id]
             for i, part in enumerate(
-                [data[i : i + step] for i in range(0, len(data), step)]
+                [data[i: i + step] for i in range(0, len(data), step)]
             )
         ]
     processes = []
