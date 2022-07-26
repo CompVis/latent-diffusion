@@ -65,8 +65,8 @@ class Searcher(object):
         assert database in DATABASES
         # self.database = self.load_database(database)
         self.database_name = database
-        self.searcher_savedir = f'models/searchers/{self.database_name}'
-        self.database_path = f'data/retrieval_databases/{self.database_name}'
+        self.searcher_savedir = f'data/rdm/searchers/{self.database_name}'
+        self.database_path = f'data/rdm/retrieval_databases/{self.database_name}'
         self.retriever = self.load_retriever(version=retriever_version)
         self.database = {'embedding': [],
                           'img_id': [],
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--database",
         type=str,
-        default=DATABASES[0],
+        default='artbench-surrealism',
         choices=DATABASES,
         help="The database used for the search",
     )

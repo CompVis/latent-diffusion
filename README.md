@@ -49,12 +49,12 @@ If you use any of these models in your work, we are always happy to receive a [c
 ![rdm-figure](assets/rdm-preview.jpg)
 We include inference code to run our retrieval-augmented diffusion models (RDMs) as described in [https://arxiv.org/abs/2204.11824](https://arxiv.org/abs/2204.11824).
 
-To get started, download the weights:
+To get started, download the trained weights:
 ```bash
-mkdir -p models/rdm/rdm768x768
-wget -O models/rdm/rdm768x768/model.ckpt TODO
-wget -O models/rdm/rdm768x768/config.yaml TODO
+mkdir models/rdm/rdm768x768/
+wget -O models/rdm/rdm768x768/model.ckpt https://ommer-lab.com/files/rdm/model.ckpt
 ```
+
 As these models are conditioned on a set of CLIP image embeddings, our RDMs support different inference modes, 
 which are described in the following.
 #### RDM with text-prompt only (no explicit retrieval needed)
@@ -66,27 +66,46 @@ python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on ca
 ```
 
 #### RDM with text-to-image retrieval
-Download the retrieval-databases which contain the retrieval-datasets (OpenImages and ArtBench) compressed into CLIP image embeddings:
+
+To be able to run a RDM conditioned on a text-prompt and additionally images retrieved from this prompt, you will also need to download the corresponding retrieval database. 
+We provide two distinct databases extracted from the [Openimages-]() and [ArtBench-]()datasets. 
+Interchanging the databases results in different capabilities 
+of the resulting semi-parametric model as visualized below #TODO although the learned weights are the same in both cases. 
+
+Download the retrieval-databases which contain the retrieval-datasets ([Openimages]() (~11GB) and [ArtBench]() (~82MB)) compressed into CLIP image embeddings:
 ```bash
-mkdir -p data/rdm/openimages
-mkdir -p data/rdm/artbench
-wget -O data/rdm/openimages/data.p TODO
-wget -O data/rdm/artbench/data.p TODO
+mkdir -p data/rdm/retrieval_databases
+wget -O data/rdm/retrieval_databases/artbench.zip https://ommer-lab.com/files/rdm/artbench_databases.zip
+wget -O data/rdm/retrieval_databases/openimages.zip https://ommer-lab.com/files/rdm/openimages_database.zip
+unzip data/rdm/retrieval_databases/artbench.zip -d data/rdm/retrieval_databases/
+unzip data/rdm/retrieval_databases/openimages.zip -d data/rdm/retrieval_databases/
 ```
-We also provide trained [ScaNN]()/[faiss]() search indices [here](TODO). Download via
+We also provide trained [ScaNN]() search indices [here](TODO). Download and extract via
 ```bash
-wget -O data/rdm/openimages/searcher.p TODO
-wget -O data/rdm/artbench/searcher TODO
+mkdir -p data/rdm/searchers
+wget -O data/rdm/searchers/artbench.zip https://ommer-lab.com/files/rdm/artbench_searchers.zip
+wget -O data/rdm/searchers/openimages.zip https://ommer-lab.com/files/rdm/openimages_searcher.zip
+unzip data/rdm/searchers/artbench.zip -d data/rdm/searchers
+unzip data/rdm/searchers/openimages.zip -d data/rdm/searchers
+
+```
+and install [ScaNN]() into the ldm environment with
+```shell script
+pip install scann
 ```
 
+Run this mode via
+```
+python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on canvas" --use_neighbors --knn <number_of_neighbors> 
+```
+Note that the maximum supported number of neighbors is 20. The database can be changed via the cmd parameter ``--database`` which can be `[openimages, artbench-art_nouveau, artbench-baroque, artbench-expressionism, artbench-impressionism, artbench-post_impressionism, artbench-realism, artbench-renaissance, artbench-romanticism, artbench-surrealism, artbench-ukiyo_e]`.
 
 
-#### RDM with image-to-image retrieval (maybe?, TODO)
-- simple modification of above section, support image encoding
 
 #### Coming Soon
 - better models
 - more resolutions
+- image-to-image retrieval
 
 ## Text-to-Image
 ![text2img-figure](assets/txt2img-preview.png) 
