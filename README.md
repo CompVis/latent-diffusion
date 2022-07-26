@@ -49,7 +49,11 @@ If you use any of these models in your work, we are always happy to receive a [c
 ![rdm-figure](assets/rdm-preview.jpg)
 We include inference code to run our retrieval-augmented diffusion models (RDMs) as described in [https://arxiv.org/abs/2204.11824](https://arxiv.org/abs/2204.11824).
 
-To get started, download the trained weights:
+To get started, install the additionally required python packages into your ldm environment
+```shell script
+pip install transformers==4.19.2 scann kornia==0.6.4
+```
+and download the trained weights:
 ```bash
 mkdir models/rdm/rdm768x768/
 wget -O models/rdm/rdm768x768/model.ckpt https://ommer-lab.com/files/rdm/model.ckpt
@@ -80,21 +84,20 @@ wget -O data/rdm/retrieval_databases/openimages.zip https://ommer-lab.com/files/
 unzip data/rdm/retrieval_databases/artbench.zip -d data/rdm/retrieval_databases/
 unzip data/rdm/retrieval_databases/openimages.zip -d data/rdm/retrieval_databases/
 ```
-We also provide trained [ScaNN]() search indices [here](TODO). Download and extract via
+We also provide trained [ScaNN]() search indices for ArtBench [here](TODO). Download and extract via
 ```bash
 mkdir -p data/rdm/searchers
 wget -O data/rdm/searchers/artbench.zip https://ommer-lab.com/files/rdm/artbench_searchers.zip
-wget -O data/rdm/searchers/openimages.zip https://ommer-lab.com/files/rdm/openimages_searcher.zip TODO not yet uploaded
-unzip data/rdm/searchers/artbench.zip -d data/rdm/searchers
 unzip data/rdm/searchers/openimages.zip -d data/rdm/searchers
-
-```
-and install [ScaNN]() into the ldm environment with
-```shell script
-pip install scann
 ```
 
-Run this mode via
+Since the index for OpenImages is large (~21 GB), we provide a script to create and save it for usage during sampling. Note however,
+that sampling with the OpenImages database will not be possible without this index. Run the script via
+```bash
+python scripts/train_searcher.py
+```
+
+After this, retrieval based text-guided sampling with visual nearest neighbors can be started via 
 ```
 python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on canvas" --use_neighbors --knn <number_of_neighbors> 
 ```
