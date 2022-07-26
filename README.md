@@ -22,7 +22,7 @@
 ## News
 
 ### July 2022
-- Inference code and model weights to run our [retrieval-augmented diffusion models](https://arxiv.org/abs/2204.11824) are now available. See ##RDM.
+- Inference code and model weights to run our [retrieval-augmented diffusion models](https://arxiv.org/abs/2204.11824) are now available. See [this section](#rdm).
 ### April 2022
 - Thanks to [Katherine Crowson](https://github.com/crowsonkb), classifier-free guidance received a ~2x speedup and the [PLMS sampler](https://arxiv.org/abs/2202.09778) is available. See also [this PR](https://github.com/CompVis/latent-diffusion/pull/51).
 
@@ -49,15 +49,16 @@ If you use any of these models in your work, we are always happy to receive a [c
 ![rdm-figure](assets/rdm-preview.jpg)
 We include inference code to run our retrieval-augmented diffusion models (RDMs) as described in [https://arxiv.org/abs/2204.11824](https://arxiv.org/abs/2204.11824).
 
-To get started, install the following dependencies into the `ldm` conda environment, 
-```bash
-pip install transformers==4.19.2 scann kornia
+
+To get started, install the additionally required python packages into your ldm environment
+```shell script
+pip install transformers==4.19.2 scann kornia==0.6.4
 ```
-and download the weights:
+and download the trained weights:
+
 ```bash
-mkdir -p models/rdm/rdm768x768
-wget -O models/rdm/rdm768x768/model.ckpt TODO
-wget -O models/rdm/rdm768x768/config.yaml TODO
+mkdir models/rdm/rdm768x768/
+wget -O models/rdm/rdm768x768/model.ckpt https://ommer-lab.com/files/rdm/model.ckpt
 ```
 As these models are conditioned on a set of CLIP image embeddings, our RDMs support different inference modes, 
 which are described in the following.
@@ -70,27 +71,45 @@ python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on ca
 ```
 
 #### RDM with text-to-image retrieval
-Download the retrieval-databases which contain the retrieval-datasets (OpenImages and ArtBench) compressed into CLIP image embeddings:
+
+To be able to run a RDM conditioned on a text-prompt and additionally images retrieved from this prompt, you will also need to download the corresponding retrieval database. 
+We provide two distinct databases extracted from the [Openimages-](https://storage.googleapis.com/openimages/web/index.html) and [ArtBench-](https://github.com/liaopeiyuan/artbench) datasets. 
+Interchanging the databases results in different capabilities 
+of the resulting semi-parametric model as visualized below #TODO although the learned weights are the same in both cases. 
+
+Download the retrieval-databases which contain the retrieval-datasets ([Openimages](https://storage.googleapis.com/openimages/web/index.html) (~11GB) and [ArtBench](https://github.com/liaopeiyuan/artbench) (~82MB)) compressed into CLIP image embeddings:
 ```bash
-mkdir -p data/rdm/openimages
-mkdir -p data/rdm/artbench
-wget -O data/rdm/openimages/data.p TODO
-wget -O data/rdm/artbench/data.p TODO
+mkdir -p data/rdm/retrieval_databases
+wget -O data/rdm/retrieval_databases/artbench.zip https://ommer-lab.com/files/rdm/artbench_databases.zip
+wget -O data/rdm/retrieval_databases/openimages.zip https://ommer-lab.com/files/rdm/openimages_database.zip
+unzip data/rdm/retrieval_databases/artbench.zip -d data/rdm/retrieval_databases/
+unzip data/rdm/retrieval_databases/openimages.zip -d data/rdm/retrieval_databases/
 ```
-We also provide trained [ScaNN]()/[faiss]() search indices [here](TODO). Download via
+We also provide trained [ScaNN](https://github.com/google-research/google-research/tree/master/scann) search indices for ArtBench. Download and extract via
 ```bash
-wget -O data/rdm/openimages/searcher.p TODO
-wget -O data/rdm/artbench/searcher TODO
+mkdir -p data/rdm/searchers
+wget -O data/rdm/searchers/artbench.zip https://ommer-lab.com/files/rdm/artbench_searchers.zip
+unzip data/rdm/searchers/openimages.zip -d data/rdm/searchers
 ```
 
+Since the index for OpenImages is large (~21 GB), we provide a script to create and save it for usage during sampling. Note however,
+that sampling with the OpenImages database will not be possible without this index. Run the script via
+```bash
+python scripts/train_searcher.py
+```
+
+After this, retrieval based text-guided sampling with visual nearest neighbors can be started via 
+```
+python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on canvas" --use_neighbors --knn <number_of_neighbors> 
+```
+Note that the maximum supported number of neighbors is 20. The database can be changed via the cmd parameter ``--database`` which can be `[openimages, artbench-art_nouveau, artbench-baroque, artbench-expressionism, artbench-impressionism, artbench-post_impressionism, artbench-realism, artbench-renaissance, artbench-romanticism, artbench-surrealism, artbench-ukiyo_e]`.
 
 
-#### RDM with image-to-image retrieval (maybe?, TODO)
-- simple modification of above section, support image encoding
 
 #### Coming Soon
 - better models
 - more resolutions
+- image-to-image retrieval
 
 ## Text-to-Image
 ![text2img-figure](assets/txt2img-preview.png) 
@@ -323,6 +342,19 @@ Thanks for open-sourcing!
       archivePrefix={arXiv},
       primaryClass={cs.CV}
 }
+
+@misc{https://doi.org/10.48550/arxiv.2204.11824,
+  doi = {10.48550/ARXIV.2204.11824},
+  url = {https://arxiv.org/abs/2204.11824},
+  author = {Blattmann, Andreas and Rombach, Robin and Oktay, Kaan and Ommer, Björn},
+  keywords = {Computer Vision and Pattern Recognition (cs.CV), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {Retrieval-Augmented Diffusion Models},
+  publisher = {arXiv},
+  year = {2022},  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+
 ```
 
 
