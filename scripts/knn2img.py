@@ -13,12 +13,10 @@ import scann
 import time
 from multiprocessing import cpu_count
 
-
 from ldm.util import instantiate_from_config, parallel_data_prefetch
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
 from ldm.modules.encoders.modules import FrozenClipImageEmbedder, FrozenCLIPTextEmbedder
-
 
 DATABASES = [
     "openimages",
@@ -69,8 +67,8 @@ class Searcher(object):
         self.database_path = f'data/retrieval_databases/{self.database_name}'
         self.retriever = self.load_retriever(version=retriever_version)
         self.database = {'embedding': [],
-                          'img_id': [],
-                          'patch_coords': []}
+                         'img_id': [],
+                         'patch_coords': []}
         self.load_database()
         self.load_searcher()
 
@@ -105,10 +103,8 @@ class Searcher(object):
 
     def load_database(self):
 
-
         print(f'Load saved patch embedding from "{self.database_path}"')
-        file_content = glob.glob(os.path.join(self.database_path,'*.npz'))
-
+        file_content = glob.glob(os.path.join(self.database_path, '*.npz'))
 
         if len(file_content) == 1:
             self.load_single_file(file_content[0])
@@ -117,15 +113,14 @@ class Searcher(object):
             prefetched_data = parallel_data_prefetch(self.load_multi_files, data,
                                                      n_proc=min(len(data), cpu_count()), target_data_type='dict')
 
-            self.database = {key: np.concatenate([od[key] for od in prefetched_data], axis=1)[0] for key in self.database}
+            self.database = {key: np.concatenate([od[key] for od in prefetched_data], axis=1)[0] for key in
+                             self.database}
         else:
             raise ValueError(f'No npz-files in specified path "{self.database_path}" is this directory existing?')
 
         print(f'Finished loading of retrieval database of length {self.database["embedding"].shape[0]}.')
 
-
-    def load_retriever(self,version='ViT-L/14',):
-
+    def load_retriever(self, version='ViT-L/14', ):
         model = FrozenClipImageEmbedder(model=version)
         if torch.cuda.is_available():
             model.cuda()
@@ -137,15 +132,14 @@ class Searcher(object):
         self.searcher = scann.scann_ops_pybind.load_searcher(self.searcher_savedir)
         print('Finished loading searcher.')
 
-
     def search(self, x, k):
         if self.searcher is None and self.database['embedding'].shape[0] < 2e4:
-            self.train_searcher(k)
+            self.train_searcher(k)   # quickly fit searcher on the fly for small databases
         assert self.searcher is not None, 'Cannot search with uninitialized searcher'
-        if isinstance(x,torch.Tensor):
+        if isinstance(x, torch.Tensor):
             x = x.detach().cpu().numpy()
         if len(x.shape) == 3:
-            x = x[:,0]
+            x = x[:, 0]
         query_embeddings = x / np.linalg.norm(x, axis=1)[:, np.newaxis]
 
         start = time.time()
@@ -169,9 +163,11 @@ class Searcher(object):
     def __call__(self, x, n):
         return self.search(x, n)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # TODO: add n_neighbors and modes (text-only, text-image-retrieval, image-image retrieval etc)
+    # TODO: add 'image variation' mode when knn=0 but a single image is given instead of a text prompt?
     parser.add_argument(
         "--prompt",
         type=str,
@@ -293,7 +289,7 @@ if __name__ == "__main__":
         type=str,
         default=DATABASES[0],
         choices=DATABASES,
-        help="The database used for the search",
+        help="The database used for the search, only applied when --use_neighbors=True",
     )
     parser.add_argument(
         "--use_neighbors",
@@ -307,7 +303,6 @@ if __name__ == "__main__":
         type=int,
         help="The number of included neighbors, only applied when --use_neighbors=True",
     )
-
 
     opt = parser.parse_args()
 
@@ -344,7 +339,7 @@ if __name__ == "__main__":
     os.makedirs(sample_path, exist_ok=True)
     base_count = len(os.listdir(sample_path))
     grid_count = len(os.listdir(outpath)) - 1
-    
+
     print(f"sampling scale for cfg is {opt.scale:.2f}")
 
     searcher = None
@@ -360,15 +355,15 @@ if __name__ == "__main__":
                     if isinstance(prompts, tuple):
                         prompts = list(prompts)
                     c = clip_text_encoder.encode(prompts)
+                    uc = None
                     if searcher is not None:
-                        nn_dict = searcher(c,opt.knn)
-                        c = torch.cat([c,torch.from_numpy(nn_dict['nn_embeddings']).cuda()],dim=1)
-                        uc = None
+                        nn_dict = searcher(c, opt.knn)
+                        c = torch.cat([c, torch.from_numpy(nn_dict['nn_embeddings']).cuda()], dim=1)
                     if opt.scale != 1.0:
                         uc = torch.zeros_like(c)
                     if isinstance(prompts, tuple):
                         prompts = list(prompts)
-                    shape = [16, opt.H//16, opt.W//16]    # note: currently hardcoded for f16 model
+                    shape = [16, opt.H // 16, opt.W // 16]  # note: currently hardcoded for f16 model
                     samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
                                                      conditioning=c,
                                                      batch_size=c.shape[0],
@@ -380,11 +375,12 @@ if __name__ == "__main__":
                                                      )
 
                     x_samples_ddim = model.decode_first_stage(samples_ddim)
-                    x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, min=0.0, max=1.0)
+                    x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
 
                     for x_sample in x_samples_ddim:
                         x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                        Image.fromarray(x_sample.astype(np.uint8)).save(os.path.join(sample_path, f"{base_count:05}.png"))
+                        Image.fromarray(x_sample.astype(np.uint8)).save(
+                            os.path.join(sample_path, f"{base_count:05}.png"))
                         base_count += 1
                     all_samples.append(x_samples_ddim)
 

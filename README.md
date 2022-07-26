@@ -49,7 +49,11 @@ If you use any of these models in your work, we are always happy to receive a [c
 ![rdm-figure](assets/rdm-preview.jpg)
 We include inference code to run our retrieval-augmented diffusion models (RDMs) as described in [https://arxiv.org/abs/2204.11824](https://arxiv.org/abs/2204.11824).
 
-To get started, download the weights:
+To get started, install the following dependencies into the `ldm` conda environment, 
+```bash
+pip install transformers==4.19.2 scann kornia
+```
+and download the weights:
 ```bash
 mkdir -p models/rdm/rdm768x768
 wget -O models/rdm/rdm768x768/model.ckpt TODO
