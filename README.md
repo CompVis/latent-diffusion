@@ -22,7 +22,7 @@
 ## News
 
 ### July 2022
-- Inference code and model weights to run our [retrieval-augmented diffusion models](https://arxiv.org/abs/2204.11824) are now available. See [this section](#rdm).
+- Inference code and model weights to run our [retrieval-augmented diffusion models](https://arxiv.org/abs/2204.11824) are now available. See [this section](#retrieval-augmented-diffusion-models).
 ### April 2022
 - Thanks to [Katherine Crowson](https://github.com/crowsonkb), classifier-free guidance received a ~2x speedup and the [PLMS sampler](https://arxiv.org/abs/2202.09778) is available. See also [this PR](https://github.com/CompVis/latent-diffusion/pull/51).
 
@@ -45,19 +45,20 @@ conda activate ldm
 A general list of all available checkpoints is available in via our [model zoo](#model-zoo).
 If you use any of these models in your work, we are always happy to receive a [citation](#bibtex).
 
-## Retrieval Augmented Diffusion Models (WIP)
+## Retrieval Augmented Diffusion Models
 ![rdm-figure](assets/rdm-preview.jpg)
 We include inference code to run our retrieval-augmented diffusion models (RDMs) as described in [https://arxiv.org/abs/2204.11824](https://arxiv.org/abs/2204.11824).
 
 
-To get started, install the additionally required python packages into your ldm environment
+To get started, install the additionally required python packages into your `ldm` environment
 ```shell script
-pip install transformers==4.19.2 scann kornia==0.6.4
+pip install transformers==4.19.2 scann kornia==0.6.4 torchmetrics==0.6.0
+pip install git+https://github.com/arogozhnikov/einops.git
 ```
-and download the trained weights:
+and download the trained weights (preliminary ceckpoints):
 
 ```bash
-mkdir models/rdm/rdm768x768/
+mkdir -p models/rdm/rdm768x768/
 wget -O models/rdm/rdm768x768/model.ckpt https://ommer-lab.com/files/rdm/model.ckpt
 ```
 As these models are conditioned on a set of CLIP image embeddings, our RDMs support different inference modes, 
@@ -74,8 +75,7 @@ python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on ca
 
 To be able to run a RDM conditioned on a text-prompt and additionally images retrieved from this prompt, you will also need to download the corresponding retrieval database. 
 We provide two distinct databases extracted from the [Openimages-](https://storage.googleapis.com/openimages/web/index.html) and [ArtBench-](https://github.com/liaopeiyuan/artbench) datasets. 
-Interchanging the databases results in different capabilities 
-of the resulting semi-parametric model as visualized below #TODO although the learned weights are the same in both cases. 
+Interchanging the databases results in different capabilities of the model as visualized below, although the learned weights are the same in both cases. 
 
 Download the retrieval-databases which contain the retrieval-datasets ([Openimages](https://storage.googleapis.com/openimages/web/index.html) (~11GB) and [ArtBench](https://github.com/liaopeiyuan/artbench) (~82MB)) compressed into CLIP image embeddings:
 ```bash
@@ -89,7 +89,7 @@ We also provide trained [ScaNN](https://github.com/google-research/google-resear
 ```bash
 mkdir -p data/rdm/searchers
 wget -O data/rdm/searchers/artbench.zip https://ommer-lab.com/files/rdm/artbench_searchers.zip
-unzip data/rdm/searchers/openimages.zip -d data/rdm/searchers
+unzip data/rdm/searchers/artbench.zip -d data/rdm/searchers
 ```
 
 Since the index for OpenImages is large (~21 GB), we provide a script to create and save it for usage during sampling. Note however,
@@ -98,11 +98,13 @@ that sampling with the OpenImages database will not be possible without this ind
 python scripts/train_searcher.py
 ```
 
-After this, retrieval based text-guided sampling with visual nearest neighbors can be started via 
+Retrieval based text-guided sampling with visual nearest neighbors can be started via 
 ```
-python scripts/knn2img.py  --prompt "a happy bear reading a newspaper, oil on canvas" --use_neighbors --knn <number_of_neighbors> 
+python scripts/knn2img.py  --prompt "a happy bear reading a newspaper" --use_neighbors --knn <number_of_neighbors> 
 ```
-Note that the maximum supported number of neighbors is 20. The database can be changed via the cmd parameter ``--database`` which can be `[openimages, artbench-art_nouveau, artbench-baroque, artbench-expressionism, artbench-impressionism, artbench-post_impressionism, artbench-realism, artbench-renaissance, artbench-romanticism, artbench-surrealism, artbench-ukiyo_e]`.
+Note that the maximum supported number of neighbors is 20. 
+The database can be changed via the cmd parameter ``--database`` which can be `[openimages, artbench-art_nouveau, artbench-baroque, artbench-expressionism, artbench-impressionism, artbench-post_impressionism, artbench-realism, artbench-renaissance, artbench-romanticism, artbench-surrealism, artbench-ukiyo_e]`.
+For using `--database openimages`, the above script (`scripts/train_searcher.py`) must be executed before.
 
 
 
