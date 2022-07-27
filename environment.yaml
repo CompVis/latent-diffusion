@@ -13,6 +13,7 @@ dependencies:
     - albumentations==0.4.3
     - opencv-python==4.1.2.30
     - pudb==2019.2
+    - torchmetrics==v0.6.0
     - imageio==2.9.0
     - imageio-ffmpeg==0.4.2
     - pytorch-lightning==1.4.2
