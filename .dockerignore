@@ -1,0 +1,6 @@
+models/
+Dockerfile
+README.md
+LICENSE
+assets/
+*.egg-info
