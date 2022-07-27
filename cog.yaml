@@ -1,0 +1,21 @@
+image: "r8.im/nicholascelestin/latent-diffusion"
+build:
+  gpu: true
+  python_packages:
+    - "torch==1.11.0"
+    - "albumentations==0.4.3"
+    - "opencv-python==4.1.2.30"
+    - "pudb==2019.2"
+    - "imageio==2.9.0"
+    - "imageio-ffmpeg==0.4.2"
+    - "pytorch-lightning==1.5.10"
+    - "omegaconf==2.1.1"
+    - "test-tube==0.7.5"
+    - "streamlit==1.10.0"
+    - "einops==0.3.0"
+    - "torch-fidelity==0.3.0"
+    - "transformers==4.3.1"
+  run:
+    - "git clone https://github.com/CompVis/taming-transformers.git && cd taming-transformers && pip install -e . && cd .."
+    - "git clone https://github.com/openai/CLIP.git && cd CLIP && pip install -e . && cd .."
+predict: "predict.py:Predictor"
