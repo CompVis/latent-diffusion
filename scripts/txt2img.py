@@ -162,4 +162,4 @@ if __name__ == "__main__":
     grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
     Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'{prompt.replace(" ", "-")}.png'))
 
-    print(f"Your samples are ready and waiting four you here: \n{outpath} \nEnjoy.")
+    print(f"Your samples are ready and waiting for you here: \n{outpath} \nEnjoy.")
