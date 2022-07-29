@@ -203,12 +203,12 @@ Torrents](http://academictorrents.com/)) and prepare ImageNet the first time it
 is used. However, since ImageNet is quite large, this requires a lot of disk
 space and time. If you already have ImageNet on your disk, you can speed things
 up by putting the data into
-`${XDG_CACHE}/autoencoders/data/ILSVRC2012_{split}/data/` (which defaults to
+`${XDG_CACHE_HOME}/autoencoders/data/ILSVRC2012_{split}/data/` (which defaults to
 `~/.cache/autoencoders/data/ILSVRC2012_{split}/data/`), where `{split}` is one
 of `train`/`validation`. It should have the following structure:
 
 ```
-${XDG_CACHE}/autoencoders/data/ILSVRC2012_{split}/data/
+${XDG_CACHE_HOME}/autoencoders/data/ILSVRC2012_{split}/data/
 ├── n01440764
 │   ├── n01440764_10026.JPEG
 │   ├── n01440764_10027.JPEG
@@ -222,12 +222,12 @@ ${XDG_CACHE}/autoencoders/data/ILSVRC2012_{split}/data/
 
 If you haven't extracted the data, you can also place
 `ILSVRC2012_img_train.tar`/`ILSVRC2012_img_val.tar` (or symlinks to them) into
-`${XDG_CACHE}/autoencoders/data/ILSVRC2012_train/` /
-`${XDG_CACHE}/autoencoders/data/ILSVRC2012_validation/`, which will then be
+`${XDG_CACHE_HOME}/autoencoders/data/ILSVRC2012_train/` /
+`${XDG_CACHE_HOME}/autoencoders/data/ILSVRC2012_validation/`, which will then be
 extracted into above structure without downloading it again.  Note that this
 will only happen if neither a folder
-`${XDG_CACHE}/autoencoders/data/ILSVRC2012_{split}/data/` nor a file
-`${XDG_CACHE}/autoencoders/data/ILSVRC2012_{split}/.ready` exist. Remove them
+`${XDG_CACHE_HOME}/autoencoders/data/ILSVRC2012_{split}/data/` nor a file
+`${XDG_CACHE_HOME}/autoencoders/data/ILSVRC2012_{split}/.ready` exist. Remove them
 if you want to force running the dataset preparation again.
 
 
