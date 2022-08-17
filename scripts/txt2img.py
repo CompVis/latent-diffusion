@@ -25,7 +25,7 @@ def load_model_from_config(config, ckpt, verbose=False):
         print("unexpected keys:")
         print(u)
 
-    model.cuda()
+    model.cuda() if torch.cuda.is_available() else model.cpu()
     model.eval()
     return model
 

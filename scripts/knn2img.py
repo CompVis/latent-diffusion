@@ -53,7 +53,7 @@ def load_model_from_config(config, ckpt, verbose=False):
         print("unexpected keys:")
         print(u)
 
-    model.cuda()
+    model.cuda() if torch.cuda.is_available() else model.cpu()
     model.eval()
     return model
 
@@ -124,6 +124,8 @@ class Searcher(object):
         model = FrozenClipImageEmbedder(model=version)
         if torch.cuda.is_available():
             model.cuda()
+        else:
+            model.cpu()
         model.eval()
         return model
 
@@ -358,7 +360,8 @@ if __name__ == "__main__":
                     uc = None
                     if searcher is not None:
                         nn_dict = searcher(c, opt.knn)
-                        c = torch.cat([c, torch.from_numpy(nn_dict['nn_embeddings']).cuda()], dim=1)
+                        nn_embeddings = torch.from_numpy(nn_dict['nn_embeddings']).cuda() if torch.cuda.is_available() else torch.from_numpy(nn_dict['nn_embeddings']).cpu()
+                        c = torch.cat([c, nn_embeddings], dim=1)
                     if opt.scale != 1.0:
                         uc = torch.zeros_like(c)
                     if isinstance(prompts, tuple):
