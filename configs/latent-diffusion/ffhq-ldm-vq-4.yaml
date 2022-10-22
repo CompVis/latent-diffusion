@@ -38,7 +38,7 @@ model:
       params:
         embed_dim: 3
         n_embed: 8192
-        ckpt_path: configs/first_stage_models/vq-f4/model.yaml
+        ckpt_path: models/first_stage_models/vq-f4/model.ckpt
         ddconfig:
           double_z: false
           z_channels: 3
