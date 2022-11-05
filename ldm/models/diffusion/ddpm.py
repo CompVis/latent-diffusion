@@ -1334,14 +1334,16 @@ class LatentDiffusion(DDPM):
                                                 ddim_steps=ddim_steps, x0=z[:N], mask=mask)
                 x_samples = self.decode_first_stage(samples.to(self.device))
                 log["samples_inpainting"] = x_samples
-                log["mask"] = mask
+                log["mask_inpainting"] = mask
 
                 # outpaint
+                mask = 1 - mask
                 with self.ema_scope("Plotting Outpaint"):
                     samples, _ = self.sample_log(cond=c, batch_size=N, ddim=use_ddim,eta=ddim_eta,
                                                 ddim_steps=ddim_steps, x0=z[:N], mask=mask)
                 x_samples = self.decode_first_stage(samples.to(self.device))
                 log["samples_outpainting"] = x_samples
+                log["mask_outpainting"] = mask
 
         if plot_progressive_rows:
             with self.ema_scope("Plotting Progressives"):
