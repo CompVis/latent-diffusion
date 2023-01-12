@@ -1,3 +1,5 @@
+# Ren, Rohan, Charlie, Yifan's adaptation of latent diffusion model
+
 # Latent Diffusion Models
 [arXiv](https://arxiv.org/abs/2112.10752) | [BibTeX](#bibtex)
 
