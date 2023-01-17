@@ -34,7 +34,7 @@ data:
         size: 256
         degradation: pil_nearest
     validation:
-      target: taming.data.faceshq.FFHQTrain
+      target: taming.data.faceshq.FFHQValidation
       params:
         size: 256
         degradation: pil_nearest
