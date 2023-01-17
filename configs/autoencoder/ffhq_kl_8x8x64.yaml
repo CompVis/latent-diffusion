@@ -29,12 +29,12 @@ data:
     batch_size: 2
     wrap: True
     train:
-      target: ldm.data.ffhq.FFHQTrain
+      target: data.ffhq.FFHQTrain
       params:
         size: 256
         degradation: pil_nearest
     validation:
-      target: ldm.data.ffhq.FFHQValidation
+      target: data.ffhq.FFHQValidation
       params:
         size: 256
         degradation: pil_nearest
