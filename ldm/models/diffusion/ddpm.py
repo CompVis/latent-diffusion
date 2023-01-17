@@ -653,11 +653,13 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
                   cond_key=None, return_original_cond=False, bs=None):
+        # x is the input
+        # c is the conditioning input
         x = super().get_input(batch, k)
         if bs is not None:
             x = x[:bs]
         x = x.to(self.device)
-        encoder_posterior = self.encode_first_stage(x)
+        encoder_posterior = self.encode_first_stage(x)  # XXX encoder posterior (should change this into two stages)
         z = self.get_first_stage_encoding(encoder_posterior).detach()
 
         if self.model.conditioning_key is not None:
