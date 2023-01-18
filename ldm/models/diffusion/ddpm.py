@@ -548,7 +548,7 @@ class LatentDiffusion(DDPM):
             raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c):
+    def get_learned_conditioning(self, c): # XXX called by conditing stage, look at previous more detailed comments
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
                 c = self.cond_stage_model.encode(c)
@@ -659,8 +659,14 @@ class LatentDiffusion(DDPM):
         if bs is not None:
             x = x[:bs]
         x = x.to(self.device)
-        encoder_posterior = self.encode_first_stage(x)  # XXX encoder posterior (should change this into two stages)
-        z = self.get_first_stage_encoding(encoder_posterior).detach()
+        encoder_posterior = self.encode_first_stage(x)  # XXX encoder posterior
+
+        # For implementing the baseline (Charlie proposed), if the LDM is the header (first cascaded) LDM,
+        # then we pass in higher resolution encoded feature vector as the encoder posterior.
+        # For example, we pass in conditional feature vector as 16x16 encoded vector, and the encoder_posterior
+        # should be 64x64 encoded vector. 
+
+        z = self.get_first_stage_encoding(encoder_posterior).detach() # XXX sample vectors from posterior distribution.
 
         if self.model.conditioning_key is not None:
             if cond_key is None:
@@ -674,6 +680,9 @@ class LatentDiffusion(DDPM):
                     xc = super().get_input(batch, cond_key).to(self.device)
             else:
                 xc = x
+
+            # Modify the conditioning information, instead of the lower resolution image, we pass in 
+            # the lower resolution image passed through an encoder from an autoencoder (trained on LR images). 
             if not self.cond_stage_trainable or force_c_encode:
                 if isinstance(xc, dict) or isinstance(xc, list):
                     # import pudb; pudb.set_trace()

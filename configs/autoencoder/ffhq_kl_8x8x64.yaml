@@ -27,7 +27,7 @@ data:
   target: main.DataModuleFromConfig
   params:
     batch_size: 2
-    wrap: True
+    wrap: false
     train:
       target: taming.data.faceshq.FFHQTrain
       params:
