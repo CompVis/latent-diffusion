@@ -19,26 +19,26 @@ model:
         out_channels: 3
         model_channels: 224
         attention_resolutions:
-        # note: this isn\t actually the resolution but
-        # the downsampling factor, i.e. this corresnponds to
-        # attention on spatial resolution 8,16,32, as the
-        # spatial reolution of the latents is 64 for f4
-        - 8
-        - 4
-        - 2
+          # note: this isn\t actually the resolution but
+          # the downsampling factor, i.e. this corresnponds to
+          # attention on spatial resolution 8,16,32, as the
+          # spatial reolution of the latents is 64 for f4
+          - 8
+          - 4
+          - 2
         num_res_blocks: 2
         channel_mult:
-        - 1
-        - 2
-        - 3
-        - 4
+          - 1
+          - 2
+          - 3
+          - 4
         num_head_channels: 32
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
         embed_dim: 3
         n_embed: 8192
-        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f4/model.yaml
+        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f4/config.yaml
         ddconfig:
           double_z: false
           z_channels: 3
@@ -47,9 +47,9 @@ model:
           out_ch: 3
           ch: 128
           ch_mult:
-          - 1
-          - 2
-          - 4
+            - 1
+            - 2
+            - 4
           num_res_blocks: 2
           attn_resolutions: []
           dropout: 0.0
@@ -70,7 +70,6 @@ data:
       target: taming.data.faceshq.FFHQValidation
       params:
         size: 256
-
 
 lightning:
   callbacks:
