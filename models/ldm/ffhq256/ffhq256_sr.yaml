@@ -18,21 +18,20 @@ model:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 64
-        in_channels: 3
+        in_channels: 6
         out_channels: 3
-        model_channels: 224
+        model_channels: 160
         attention_resolutions:
+          - 16
           - 8
-          - 4
-          - 2
         num_res_blocks: 2
         channel_mult:
           - 1
           - 2
-          - 3
+          - 2
           - 4
         num_head_channels: 32
-    first_stage_config: # uses
+    first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
         embed_dim: 3
