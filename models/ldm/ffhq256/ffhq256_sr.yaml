@@ -6,6 +6,7 @@ model:
     linear_end: 0.0195
     log_every_t: 200
     timesteps: 1000
+    loss_type: l2
     first_stage_key: image
     cond_stage_key: LR_image
     image_size: 64
