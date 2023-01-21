@@ -328,7 +328,7 @@ class DDPM(pl.LightningModule):
     # XXX getting error now
     def get_input(self, batch, k):
         print("k is", k)
-        print("batch is", batch)
+        print("batch is", batch.keys())
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
