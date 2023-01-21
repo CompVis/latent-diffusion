@@ -60,7 +60,7 @@ data:
   target: main.DataModuleFromConfig
   params:
     batch_size: 2
-    num_workers: 1
+    num_workers: 42
     wrap: false
     train:
       target: taming.data.faceshq.FFHQTrain
