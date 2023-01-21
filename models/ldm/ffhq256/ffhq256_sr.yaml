@@ -64,7 +64,7 @@ data:
     num_workers: 5
     wrap: false
     train:
-      target: taming.data.faceshq.FFHQTrain
+      target: taming.data.ffhq.FFHQSRTrain
       params:
         size: 256
         degradation: bsrgan_light
@@ -73,7 +73,7 @@ data:
         max_crop_f: 1.0
         random_crop: true
     validation:
-      target: taming.data.faceshq.FFHQValidation
+      target: taming.data.ffhq.FFHQSRValidation
       params:
         size: 256
         degradation: bsrgan_light
