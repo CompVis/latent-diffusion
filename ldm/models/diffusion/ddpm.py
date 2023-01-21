@@ -325,8 +325,10 @@ class DDPM(pl.LightningModule):
         # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         return self.p_losses(x, t, *args, **kwargs)
-
+    # XXX getting error now
     def get_input(self, batch, k):
+        print("k is", k)
+        print("batch is", batch)
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
@@ -668,10 +670,11 @@ class LatentDiffusion(DDPM):
 
         z = self.get_first_stage_encoding(encoder_posterior).detach() # XXX sample vectors from posterior distribution.
 
+        # XXX look at here
         if self.model.conditioning_key is not None:
             if cond_key is None:
                 cond_key = self.cond_stage_key
-            if cond_key != self.first_stage_key:
+            if cond_key != self.first_stage_key: # cond_key is different from first_stage_key
                 if cond_key in ['caption', 'coordinates_bbox']:
                     xc = batch[cond_key]
                 elif cond_key == 'class_label':
