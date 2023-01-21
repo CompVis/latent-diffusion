@@ -420,7 +420,7 @@ class DDPM(pl.LightningModule):
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
 
-
+# Superresolution uses this. (DDPM is a parent class, passing conditioning_key into superresolution)
 class LatentDiffusion(DDPM):
     """main class"""
     def __init__(self,
@@ -440,7 +440,7 @@ class LatentDiffusion(DDPM):
         assert self.num_timesteps_cond <= kwargs['timesteps']
         # for backwards compatibility after implementation of DiffusionWrapper
         if conditioning_key is None:
-            conditioning_key = 'concat' if concat_mode else 'crossattn'
+            conditioning_key = 'concat' if concat_mode else 'crossattn' # Here is where we set conditioning key to concat
         if cond_stage_config == '__is_unconditional__':
             conditioning_key = None
         ckpt_path = kwargs.pop("ckpt_path", None)
@@ -1402,7 +1402,7 @@ class LatentDiffusion(DDPM):
         x = 2. * (x - x.min()) / (x.max() - x.min()) - 1.
         return x
 
-
+# Called by DDPM (hierarchy: LDM -> DDPM -> DiffusionWrapper)
 class DiffusionWrapper(pl.LightningModule):
     def __init__(self, diff_model_config, conditioning_key):
         super().__init__()
