@@ -67,7 +67,17 @@ data:
       target: taming.data.faceshq.FFHQTrain
       params:
         size: 256
+        degradation: bsrgan_light
+        downscale_f: 4
+        min_crop_f: 0.5
+        max_crop_f: 1.0
+        random_crop: true
     validation:
       target: taming.data.faceshq.FFHQValidation
       params:
         size: 256
+        degradation: bsrgan_light
+        downscale_f: 4
+        min_crop_f: 0.5
+        max_crop_f: 1.0
+        random_crop: true
