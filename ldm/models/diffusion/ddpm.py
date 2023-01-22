@@ -327,8 +327,8 @@ class DDPM(pl.LightningModule):
         return self.p_losses(x, t, *args, **kwargs)
     # XXX getting error now
     def get_input(self, batch, k):
-        print("k is", k)
-        print("batch is", batch.keys())
+        # print("k is", k)
+        # print("batch is", batch.keys())
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
@@ -1417,7 +1417,7 @@ class DiffusionWrapper(pl.LightningModule):
         if self.conditioning_key is None:
             out = self.diffusion_model(x, t)
         elif self.conditioning_key == 'concat': # XXX check the dimensino for x and c_concat. 
-            print("Peter wants x and c_concat's shape", x.shape, c_concat[0].shape)
+            # print("Peter wants x and c_concat's shape", x.shape, c_concat[0].shape)
             xc = torch.cat([x] + c_concat, dim=1)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
