@@ -1,10 +1,10 @@
 model:
-  base_learning_rate: 2.0e-06
+  base_learning_rate: 1.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.0015
-    linear_end: 0.0195
-    log_every_t: 200
+    linear_end: 0.0155
+    log_every_t: 100
     timesteps: 1000
     loss_type: l2
     first_stage_key: image
