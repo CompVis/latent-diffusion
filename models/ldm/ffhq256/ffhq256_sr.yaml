@@ -5,7 +5,7 @@ model:
     linear_start: 0.0015
     linear_end: 0.0155
     log_every_t: 100
-    timesteps: 1000
+    timesteps: 100 # original 1000
     loss_type: l2
     first_stage_key: image
     cond_stage_key: LR_image
