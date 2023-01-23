@@ -711,10 +711,8 @@ class LatentDiffusion(DDPM):
         if return_first_stage_outputs:
             xrec = self.decode_first_stage(z)
             out.extend([x, xrec])
-            print("i'm here")
         if return_original_cond:
             out.append(xc)
-            print("i'm there")
         print("GET_INPUT: end out dimension", len(out), out[0].shape, out[1].shape)
         return out
 
@@ -879,6 +877,7 @@ class LatentDiffusion(DDPM):
             return self.first_stage_model.encode(x)
 
     def shared_step(self, batch, **kwargs):
+        # x, c -> dispatch `get_input`
         x, c = self.get_input(batch, self.first_stage_key)
         loss = self(x, c)
         return loss
@@ -940,8 +939,8 @@ class LatentDiffusion(DDPM):
                 c = unfold(c)
                 c = c.view((c.shape[0], -1, ks[0], ks[1], c.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
 
-                cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])]
-
+                cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])] # XXX cond_list is here where we pass in as `c_concat`
+                print("COND_LIST: in `apply model`", cond_list)
             elif self.cond_stage_key == 'coordinates_bbox':
                 assert 'original_image_size' in self.split_input_params, 'BoudingBoxRescaling is missing original_image_size'
 
@@ -988,7 +987,7 @@ class LatentDiffusion(DDPM):
                 cond_list = [cond for i in range(z.shape[-1])]  # Todo make this more efficient
 
             # apply model by loop over crops
-            output_list = [self.model(z_list[i], t, **cond_list[i]) for i in range(z.shape[-1])]
+            output_list = [self.model(z_list[i], t, **cond_list[i]) for i in range(z.shape[-1])] # XXX applied self.model, i.e. diffusionwrapper
             assert not isinstance(output_list[0],
                                   tuple)  # todo cant deal with multiple model outputs check this never happens
 
