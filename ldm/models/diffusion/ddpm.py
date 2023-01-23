@@ -325,10 +325,7 @@ class DDPM(pl.LightningModule):
         # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
         return self.p_losses(x, t, *args, **kwargs)
-    # XXX getting error now
     def get_input(self, batch, k):
-        # print("k is", k)
-        # print("batch is", batch.keys())
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
