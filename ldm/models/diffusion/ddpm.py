@@ -713,7 +713,7 @@ class LatentDiffusion(DDPM):
             out.extend([x, xrec])
         if return_original_cond:
             out.append(xc)
-        print("GET_INPUT: end out", len(out))
+        print("GET_INPUT: end out dimension", np.array(out).shape)
         return out
 
     @torch.no_grad()
