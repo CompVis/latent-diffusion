@@ -711,9 +711,11 @@ class LatentDiffusion(DDPM):
         if return_first_stage_outputs:
             xrec = self.decode_first_stage(z)
             out.extend([x, xrec])
+            print("i'm here")
         if return_original_cond:
             out.append(xc)
-        print("GET_INPUT: end out dimension", np.array(out).shape)
+            print("i'm there")
+        print("GET_INPUT: end out dimension", len(out), out[0].shape, out[1].shape)
         return out
 
     @torch.no_grad()
