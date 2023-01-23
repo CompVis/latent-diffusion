@@ -652,6 +652,7 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
                   cond_key=None, return_original_cond=False, bs=None):
+        print("GET_INPUT: check cond_key and conditioning_key", cond_key, self.model.conditioning_key)
         # x is the input
         # c is the conditioning input
         x = super().get_input(batch, k)
@@ -666,7 +667,7 @@ class LatentDiffusion(DDPM):
         # should be 64x64 encoded vector. 
 
         z = self.get_first_stage_encoding(encoder_posterior).detach() # XXX sample vectors from posterior distribution.
-
+        print("GET_INPUT: z dim in get_input", z.shape)
         # XXX look at here
         if self.model.conditioning_key is not None:
             if cond_key is None:
@@ -705,12 +706,14 @@ class LatentDiffusion(DDPM):
             if self.use_positional_encodings:
                 pos_x, pos_y = self.compute_latent_shifts(batch)
                 c = {'pos_x': pos_x, 'pos_y': pos_y}
+        print("GET_INPUT: z, c:", z.shape, c.shape)
         out = [z, c]
         if return_first_stage_outputs:
             xrec = self.decode_first_stage(z)
             out.extend([x, xrec])
         if return_original_cond:
             out.append(xc)
+        print("GET_INPUT: end out", len(out))
         return out
 
     @torch.no_grad()
