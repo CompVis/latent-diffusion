@@ -35,13 +35,13 @@ model:
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
-        embed_dim: 3
-        n_embed: 8192
-        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f4/model.ckpt
+        embed_dim: 4
+        n_embed: 16384
+        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f8/model.ckpt
         monitor: val/rec_loss
         ddconfig:
           double_z: false
-          z_channels: 3
+          z_channels: 4
           resolution: 256
           in_channels: 3
           out_ch: 3
@@ -49,9 +49,11 @@ model:
           ch_mult:
             - 1
             - 2
+            - 2
             - 4
           num_res_blocks: 2
-          attn_resolutions: []
+          attn_resolutions:
+            - 32
           dropout: 0.0
         lossconfig:
           target: torch.nn.Identity
