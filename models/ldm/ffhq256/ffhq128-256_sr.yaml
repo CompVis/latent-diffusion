@@ -35,9 +35,9 @@ model:
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
+        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f8-n256/model.ckpt
         embed_dim: 4
-        n_embed: 16384
-        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f8/model.ckpt
+        n_embed: 256
         monitor: val/rec_loss
         ddconfig:
           double_z: false
