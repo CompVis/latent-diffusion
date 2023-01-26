@@ -277,6 +277,9 @@ class DDPM(pl.LightningModule):
                 extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise)
 
     def get_loss(self, pred, target, mean=True):
+        print("LOSS PRED:", pred.shape)
+        print("LOSS PRED:", target.shape)
+
         if self.loss_type == 'l1':
             loss = (target - pred).abs()
             if mean:
