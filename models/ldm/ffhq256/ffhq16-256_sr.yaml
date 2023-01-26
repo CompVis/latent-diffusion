@@ -11,7 +11,7 @@ model:
     first_stage_key: image
     cond_stage_key: LR_image
     image_size: 16
-    channels: 3
+    channels: 8 # original 3, now 8
     cond_stage_trainable: false
     concat_mode: true
     monitor: val/loss
