@@ -19,7 +19,7 @@ model:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 16
-        in_channels: 11
+        in_channels: 11 # original 6, now 3 + 8, but it's not working since embedding and image need same dimension
         out_channels: 3
         model_channels: 160
         attention_resolutions:
