@@ -279,7 +279,6 @@ class DDPM(pl.LightningModule):
     def get_loss(self, pred, target, mean=True):
         print("LOSS PRED:", pred.shape)
         print("LOSS PRED:", target.shape)
-
         if self.loss_type == 'l1':
             loss = (target - pred).abs()
             if mean:
@@ -1041,7 +1040,6 @@ class LatentDiffusion(DDPM):
             target = noise
         else:
             raise NotImplementedError()
-
         loss_simple = self.get_loss(model_output, target, mean=False).mean([1, 2, 3])
         loss_dict.update({f'{prefix}/loss_simple': loss_simple.mean()})
 
@@ -1423,6 +1421,8 @@ class DiffusionWrapper(pl.LightningModule):
         elif self.conditioning_key == 'concat': # XXX check the dimensino for x and c_concat. 
             # print("Peter wants x and c_concat's shape", x.shape, c_concat[0].shape)
             xc = torch.cat([x] + c_concat, dim=1)
+            print("SUCCESS IN CONCAT x:s " x.shape)
+            print("SUCCESS IN CONCAT c_concat: ", c_concat[0].shape)
             print("SUCCESS IN CONCAT: ", xc.shape)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
