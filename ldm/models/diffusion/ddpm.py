@@ -927,8 +927,8 @@ class LatentDiffusion(DDPM):
             z = unfold(x_noisy)  # (bn, nc * prod(**ks), L)
             # Reshape to img shape
             z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
-            z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
-
+            z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])] # XXX ?
+            print("APPLY_MODEL:", self.cond_stage_key)
             if self.cond_stage_key in ["image", "LR_image", "segmentation",
                                        'bbox_img'] and self.model.conditioning_key:  # todo check for completeness
                 c_key = next(iter(cond.keys()))  # get key
@@ -1420,6 +1420,7 @@ class DiffusionWrapper(pl.LightningModule):
         elif self.conditioning_key == 'concat': # XXX check the dimensino for x and c_concat. 
             # print("Peter wants x and c_concat's shape", x.shape, c_concat[0].shape)
             xc = torch.cat([x] + c_concat, dim=1)
+            print("SUCCESS IN CONCAT: ", xc.shape)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
             cc = torch.cat(c_crossattn, 1)
