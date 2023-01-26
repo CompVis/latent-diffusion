@@ -277,8 +277,8 @@ class DDPM(pl.LightningModule):
                 extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise)
 
     def get_loss(self, pred, target, mean=True):
-        print("LOSS PRED:", pred.shape)
-        print("LOSS PRED:", target.shape)
+        # print("LOSS PRED:", pred.shape)
+        # print("LOSS PRED:", target.shape)
         if self.loss_type == 'l1':
             loss = (target - pred).abs()
             if mean:
@@ -654,7 +654,7 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
                   cond_key=None, return_original_cond=False, bs=None):
-        print("GET_INPUT: check cond_key and conditioning_key", cond_key, self.model.conditioning_key)
+        # print("GET_INPUT: check cond_key and conditioning_key", cond_key, self.model.conditioning_key)
         # x is the input
         # c is the conditioning input
         x = super().get_input(batch, k)
@@ -669,7 +669,7 @@ class LatentDiffusion(DDPM):
         # should be 64x64 encoded vector. 
 
         z = self.get_first_stage_encoding(encoder_posterior).detach() # XXX sample vectors from posterior distribution.
-        print("GET_INPUT: z dim in get_input", z.shape)
+        # print("GET_INPUT: z dim in get_input", z.shape)
         # XXX look at here
         if self.model.conditioning_key is not None:
             if cond_key is None:
@@ -708,14 +708,14 @@ class LatentDiffusion(DDPM):
             if self.use_positional_encodings:
                 pos_x, pos_y = self.compute_latent_shifts(batch)
                 c = {'pos_x': pos_x, 'pos_y': pos_y}
-        print("GET_INPUT: z, c:", z.shape, c.shape)
+        # print("GET_INPUT: z, c:", z.shape, c.shape)
         out = [z, c]
         if return_first_stage_outputs:
             xrec = self.decode_first_stage(z)
             out.extend([x, xrec])
         if return_original_cond:
             out.append(xc)
-        print("GET_INPUT: end out dimension", len(out), out[0].shape, out[1].shape)
+        # print("GET_INPUT: end out dimension", len(out), out[0].shape, out[1].shape)
         return out
 
     @torch.no_grad()
@@ -930,7 +930,7 @@ class LatentDiffusion(DDPM):
             # Reshape to img shape
             z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
             z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])] # XXX ?
-            print("APPLY_MODEL:", self.cond_stage_key)
+            # print("APPLY_MODEL:", self.cond_stage_key)
             if self.cond_stage_key in ["image", "LR_image", "segmentation",
                                        'bbox_img'] and self.model.conditioning_key:  # todo check for completeness
                 c_key = next(iter(cond.keys()))  # get key
@@ -942,7 +942,7 @@ class LatentDiffusion(DDPM):
                 c = c.view((c.shape[0], -1, ks[0], ks[1], c.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
 
                 cond_list = [{c_key: [c[:, :, :, :, i]]} for i in range(c.shape[-1])] # XXX cond_list is here where we pass in as `c_concat`
-                print("COND_LIST: in `apply model`", cond_list)
+                # print("COND_LIST: in `apply model`", cond_list)
             elif self.cond_stage_key == 'coordinates_bbox':
                 assert 'original_image_size' in self.split_input_params, 'BoudingBoxRescaling is missing original_image_size'
 
@@ -1421,9 +1421,9 @@ class DiffusionWrapper(pl.LightningModule):
         elif self.conditioning_key == 'concat': # XXX check the dimensino for x and c_concat. 
             # print("Peter wants x and c_concat's shape", x.shape, c_concat[0].shape)
             xc = torch.cat([x] + c_concat, dim=1)
-            print("SUCCESS IN CONCAT x:s ", x.shape)
-            print("SUCCESS IN CONCAT c_concat: ", c_concat[0].shape)
-            print("SUCCESS IN CONCAT: ", xc.shape)
+            # print("SUCCESS IN CONCAT x:s ", x.shape)
+            # print("SUCCESS IN CONCAT c_concat: ", c_concat[0].shape)
+            # print("SUCCESS IN CONCAT: ", xc.shape)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
             cc = torch.cat(c_crossattn, 1)
