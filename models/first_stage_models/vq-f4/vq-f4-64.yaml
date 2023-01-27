@@ -14,9 +14,9 @@ model:
       out_ch: 3
       ch: 128
       ch_mult:
-      - 1
-      - 2
-      - 4
+        - 1
+        - 2
+        - 4
       num_res_blocks: 2
       attn_resolutions: []
       dropout: 0.0
@@ -36,10 +36,10 @@ data:
     num_workers: 16
     wrap: false
     train:
-      target: taming.data.faceshq.FFHQSRTrain
+      target: taming.data.faceshq.FFHQTrain
       params:
         size: 256
     validation:
-      target: taming.data.faceshq.FFHQSRValidation
+      target: taming.data.faceshq.FFHQValidation
       params:
         size: 256
