@@ -1,3 +1,4 @@
+# from 64 -> 256 ffhq config (adapted from bsr_sr, official source config superresolution)
 model:
   base_learning_rate: 1.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
@@ -18,8 +19,8 @@ model:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 64
-        in_channels: 6
-        out_channels: 3
+        in_channels: 6 # different from unconditional generation, where in_channels = 3
+        out_channels: 3 # pass into decoder
         model_channels: 160
         attention_resolutions:
           - 16

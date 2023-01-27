@@ -2,14 +2,14 @@ model:
   base_learning_rate: 4.5e-06
   target: ldm.models.autoencoder.VQModel
   params:
-    embed_dim: 8
-    n_embed: 16384
+    embed_dim: 8 # dimension of the embedding vector
+    n_embed: 16384 # number of embedding vectors (codebook)
     ddconfig:
       double_z: false
-      z_channels: 8
-      resolution: 256
-      in_channels: 3
-      out_ch: 3
+      z_channels: 8 # same as embed_dim
+      resolution: 256 # resolution of the image
+      in_channels: 3 # always in_channels = 3 in first stage models
+      out_ch: 3 # what is this?
       ch: 128
       ch_mult:
       - 1
