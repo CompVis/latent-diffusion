@@ -9,7 +9,7 @@ model:
     ddconfig:
       double_z: false
       z_channels: 3
-      resolution: 256
+      resolution: 64
       in_channels: 3
       out_ch: 3
       ch: 128
@@ -34,12 +34,12 @@ data:
   params:
     batch_size: 8
     num_workers: 16
-    wrap: true
+    wrap: false
     train:
-      target: ldm.data.openimages.FullOpenImagesTrain
+      target: taming.data.ffhq.FFHQSRTrain
       params:
-        crop_size: 256
+        size: 256
     validation:
-      target: ldm.data.openimages.FullOpenImagesValidation
+      target: taming.data.ffhq.FFHQSRValidation
       params:
-        crop_size: 256
+        size: 256

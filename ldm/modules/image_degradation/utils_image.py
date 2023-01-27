@@ -635,6 +635,7 @@ def calculate_psnr(img1, img2, border=0):
         return float('inf')
     return 20 * math.log10(255.0 / math.sqrt(mse))
 
+# get 100 points
 
 # --------------------------------------------
 # SSIM
