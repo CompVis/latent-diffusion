@@ -38,8 +38,8 @@ data:
     train:
       target: taming.data.faceshq.FFHQTrain
       params:
-        size: 256
+        size: 64
     validation:
       target: taming.data.faceshq.FFHQValidation
       params:
-        size: 256
+        size: 64
