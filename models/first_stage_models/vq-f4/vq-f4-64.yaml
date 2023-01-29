@@ -34,7 +34,7 @@ data:
   params:
     batch_size: 8
     num_workers: 2
-    wrap: false
+    wrap: true
     train:
       target: taming.data.faceshq.FFHQTrain
       params:
