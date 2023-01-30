@@ -18,16 +18,15 @@ model:
       in_channels: 3
       out_ch: 3
       ch: 128
-      ch_mult: [ 1,2,4 ]  # num_down = len(ch_mult)-1
+      ch_mult: [1, 2, 4] # num_down = len(ch_mult)-1
       num_res_blocks: 2
-      attn_resolutions: [ ]
+      attn_resolutions: []
       dropout: 0.0
-
 
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 12
+    batch_size: 2
     wrap: True
     train:
       target: ldm.data.imagenet.ImageNetSRTrain
