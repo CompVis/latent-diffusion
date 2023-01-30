@@ -1,3 +1,4 @@
+# Original, for testing purposes. Not used in baseline
 model:
   base_learning_rate: 4.5e-06
   target: ldm.models.autoencoder.VQModel
