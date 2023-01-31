@@ -1,5 +1,4 @@
-# DEPRECATED
-# from 128 -> 256 ffhq config (adapted from bsr_sr & ffhq256_sr.yaml, official source config superresolution)
+# from 16 -> 64 ffhq config (adapted from bsr_sr, official source config superresolution), use ffhq64 AE model
 model:
   base_learning_rate: 1.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
@@ -11,17 +10,17 @@ model:
     loss_type: l2
     first_stage_key: image
     cond_stage_key: LR_image
-    image_size: 128 # original 64
-    channels: 3
+    image_size: 16
+    channels: 3 # original 3, now 8; 8 is the latent space channels (embedding size), because 3 x 16 x 16
     cond_stage_trainable: false
     concat_mode: true
     monitor: val/loss
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
-        image_size: 128 # original 64
-        in_channels: 6
-        out_channels: 3
+        image_size: 16
+        in_channels: 6 # original 6, now 3 + 3, but it's not working since embedding and image need same dimension
+        out_channels: 3 # original 3, now 8, 1-to-1 correspondence with channels
         model_channels: 160
         attention_resolutions:
           - 16
@@ -36,25 +35,23 @@ model:
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
-        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f8/model.ckpt
-        embed_dim: 4
-        n_embed: 16384
+        ckpt_path: /home/zhren/Charlie/charlie-latent-diffusion/latent-diffusion/logs/2023-01-29T22-47-12_vq-f4-64/checkpoints/epoch=000041.ckpt
+        embed_dim: 3
+        n_embed: 8192
         monitor: val/rec_loss
         ddconfig:
           double_z: false
-          z_channels: 4
-          resolution: 256
+          z_channels: 3
+          resolution: 64
           in_channels: 3
           out_ch: 3
           ch: 128
           ch_mult:
             - 1
             - 2
-            - 2
             - 4
           num_res_blocks: 2
-          attn_resolutions:
-            - 32
+          attn_resolutions: []
           dropout: 0.0
         lossconfig:
           target: torch.nn.Identity
@@ -69,18 +66,18 @@ data:
     train:
       target: taming.data.ffhq.FFHQSRTrain
       params:
-        size: 256
+        size: 64
         degradation: bsrgan_light
-        downscale_f: 2
+        downscale_f: 4
         min_crop_f: 0.5
         max_crop_f: 1.0
         random_crop: true
     validation:
       target: taming.data.ffhq.FFHQSRValidation
       params:
-        size: 256
+        size: 64
         degradation: bsrgan_light
-        downscale_f: 2
+        downscale_f: 4
         min_crop_f: 0.5
         max_crop_f: 1.0
         random_crop: true

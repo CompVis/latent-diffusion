@@ -5,7 +5,6 @@ model:
     embed_dim: 3
     n_embed: 8192
     monitor: val/rec_loss
-
     ddconfig:
       double_z: false
       z_channels: 3
