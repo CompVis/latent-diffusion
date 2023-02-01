@@ -1428,10 +1428,11 @@ class DiffusionWrapper(pl.LightningModule):
             out = self.diffusion_model(x, t)
         elif self.conditioning_key == 'concat': # XXX check the dimensino for x and c_concat. 
             # print("Peter wants x and c_concat's shape", x.shape, c_concat[0].shape)
-            xc = torch.cat([x] + c_concat, dim=1)
-            # print("SUCCESS IN CONCAT x:s ", x.shape)
-            # print("SUCCESS IN CONCAT c_concat: ", c_concat[0].shape)
+            
+            print("SUCCESS IN CONCAT x:s ", x.shape)
+            print("SUCCESS IN CONCAT c_concat: ", c_concat[0].shape)
             # print("SUCCESS IN CONCAT: ", xc.shape)
+            xc = torch.cat([x] + c_concat, dim=1)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
             cc = torch.cat(c_crossattn, 1)
