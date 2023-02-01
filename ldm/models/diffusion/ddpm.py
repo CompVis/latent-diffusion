@@ -711,15 +711,15 @@ class LatentDiffusion(DDPM):
                 c = {'pos_x': pos_x, 'pos_y': pos_y}
         # print("GET_INPUT: z, c:", z.shape, c.shape)
 
-        # todo: upsample c from 32x32 to 64x64
-        m = Upsample(scale_factor=2, mode='bilinear')
-        c_upsampled = m(c) # if c is 32x32, c_upsampled is 64x64
-        encoder_posterior_c = self.encode_first_stage(c_upsampled)  # XXX encoder posterior for c_upsampled
-        c_encoded = self.get_first_stage_encoding(encoder_posterior_c).detach() # XXX sample vectors from posterior distribution.
-        # print("GET_INPUT: c_encoded dim in get_input", c_encoded.shape)
-        print("GET_INPUT: z, c_encoded:", z.shape, c_encoded.shape)
+        # # todo: upsample c from 32x32 to 64x64 (will do later)
+        # m = Upsample(scale_factor=2, mode='bilinear')
+        # c_upsampled = m(c) # if c is 32x32, c_upsampled is 64x64
+        # encoder_posterior_c = self.encode_first_stage(c_upsampled)  # XXX encoder posterior for c_upsampled
+        # c_encoded = self.get_first_stage_encoding(encoder_posterior_c).detach() # XXX sample vectors from posterior distribution.
+        # # print("GET_INPUT: c_encoded dim in get_input", c_encoded.shape)
+        # print("GET_INPUT: z, c_encoded:", z.shape, c_encoded.shape)
 
-        out = [z, c_encoded]
+        out = [z, c]
         if return_first_stage_outputs:
             xrec = self.decode_first_stage(z)
             out.extend([x, xrec])
