@@ -18,7 +18,7 @@ model:
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
-        image_size: 32
+        image_size: 16
         in_channels: 6 # original 6, now 3 + 3, but it's not working since embedding and image need same dimension
         out_channels: 3 # original 3, now 8, 1-to-1 correspondence with channels
         model_channels: 160
