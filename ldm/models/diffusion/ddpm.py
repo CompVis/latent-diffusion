@@ -24,6 +24,7 @@ from ldm.modules.distributions.distributions import normal_kl, DiagonalGaussianD
 from ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, AutoencoderKL
 from ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
 from ldm.models.diffusion.ddim import DDIMSampler
+from torch.nn.modules.upsampling import Upsample
 
 
 __conditioning_keys__ = {'concat': 'c_concat',
@@ -709,7 +710,14 @@ class LatentDiffusion(DDPM):
                 pos_x, pos_y = self.compute_latent_shifts(batch)
                 c = {'pos_x': pos_x, 'pos_y': pos_y}
         # print("GET_INPUT: z, c:", z.shape, c.shape)
-        out = [z, c]
+
+        # todo: upsample c from 32x32 to 64x64
+        m = Upsample(scale_factor=2, mode='bilinear')
+        c_upsampled = m(c) # if c is 32x32, c_upsampled is 64x64
+        encoder_posterior_c = self.encode_first_stage(c_upsampled)  # XXX encoder posterior for c_upsampled
+        c_encoded = self.get_first_stage_encoding(encoder_posterior_c).detach() # XXX sample vectors from posterior distribution.
+        
+        out = [z, c_encoded]
         if return_first_stage_outputs:
             xrec = self.decode_first_stage(z)
             out.extend([x, xrec])

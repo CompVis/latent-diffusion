@@ -55,10 +55,15 @@ def get_model(mode):
     model, step = load_model_from_config(config, path_ckpt)
     return model
 
+def get_local_model(path_conf, path_ckpt):
+    # path_conf, path_ckpt = download_models(mode)
+    config = OmegaConf.load(path_conf)
+    model, step = load_model_from_config(config, path_ckpt)
+    return model
 
 def get_custom_cond(mode):
-    dest = "data/example_conditioning"
-
+    dest = "data/example_conditioning" # FIXME: where to run inference code?
+                                        # 把uploaded的图片放到这个文件夹下，改一个名字
     if mode == "superresolution":
         uploaded_img = files.upload()
         filename = next(iter(uploaded_img))
