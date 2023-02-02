@@ -1,6 +1,7 @@
 # FFHQ AE 64->16x16x3
 config file: models/first_stage_models/vq-f4/vq-f4-64.yaml
 
+```python
 model:
   base_learning_rate: 4.5e-06
   target: ldm.models.autoencoder.VQModel
@@ -30,6 +31,7 @@ model:
         disc_start: 0
         disc_weight: 0.75
         codebook_weight: 1.0
+```
 
 Comments: encounter a bug in autoencoder that has an unantipated parameter `predicted indices`, which I refer to github issue to delete all occurances of this parameters during training. We can run it on custom datasets
 
