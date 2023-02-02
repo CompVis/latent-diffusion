@@ -35,7 +35,7 @@ model:
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
-        ckpt_path: /home/zhren/Charlie/charlie-latent-diffusion/latent-diffusion/logs/2023-01-29T22-47-12_vq-f4-64/checkpoints/epoch=000041.ckpt
+        ckpt_path: /home/zhren/Charlie/charlie-latent-diffusion/latent-diffusion/logs/2023-01-31T21-11-20_vq-f2-64/checkpoints/epoch=000168.ckpt
         embed_dim: 3
         n_embed: 8192
         monitor: val/rec_loss
