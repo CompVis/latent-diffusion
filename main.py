@@ -456,7 +456,7 @@ if __name__ == "__main__":
     #           target: importpath
     #           params:
     #               key: value
-
+    torch.cuda.empty_cache()
     now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 
     # add cwd for convenience and to make classes in this file available when
