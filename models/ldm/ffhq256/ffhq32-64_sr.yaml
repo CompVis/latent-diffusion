@@ -11,7 +11,7 @@ model:
     first_stage_key: image
     cond_stage_key: LR_image
     image_size: 32
-    channels: 3 # original 3, now 8; 8 is the latent space channels (embedding size), because 3 x 16 x 16
+    channels: 3 # original 3, now 8; 8 is the latent space channels (embedding size), because 3 x 32 x 32
     cond_stage_trainable: false
     concat_mode: true
     monitor: val/loss
@@ -49,7 +49,6 @@ model:
           ch_mult:
             - 1
             - 2
-            - 4
           num_res_blocks: 2
           attn_resolutions: []
           dropout: 0.0
