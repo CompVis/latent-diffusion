@@ -37,7 +37,8 @@ model:
       params:
         embed_dim: 3
         n_embed: 8192
-        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f4/model.ckpt
+        ckpt_path: /home/zhren/Charlie/latent-diffusion/models/first_stage_models/vq-f4/model.ckpt # used during train
+        # ckpt_path: ./models/first_stage_models/vq-f4/model.ckpt # used during inference
         monitor: val/rec_loss
         ddconfig:
           double_z: false
