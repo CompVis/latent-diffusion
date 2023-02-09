@@ -3,6 +3,7 @@ model:
   base_learning_rate: 1.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
   params:
+    ckpt_path: /home/zhren/Charlie/charlie-latent-diffusion/latent-diffusion/logs/2023-01-21T17-53-30_ffhq256_sr/checkpoints/epoch=000052.ckpt
     linear_start: 0.0015
     linear_end: 0.0155
     log_every_t: 100
