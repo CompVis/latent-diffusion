@@ -606,7 +606,7 @@ class LatentDiffusion(DDPM):
         :return: n img crops of size (n, bs, c, kernel_size[0], kernel_size[1])
         """
         bs, nc, h, w = x.shape
-
+        print("running get fold unfold")
         # number of crops in image
         Ly = (h - kernel_size[0]) // stride[0] + 1
         Lx = (w - kernel_size[1]) // stride[1] + 1
@@ -631,6 +631,7 @@ class LatentDiffusion(DDPM):
             fold = torch.nn.Fold(output_size=(x.shape[2] * uf, x.shape[3] * uf), **fold_params2)
 
             weighting = self.get_weighting(kernel_size[0] * uf, kernel_size[1] * uf, Ly, Lx, x.device).to(x.dtype)
+
             normalization = fold(weighting).view(1, 1, h * uf, w * uf)  # normalizes the overlap
             weighting = weighting.view((1, 1, kernel_size[0] * uf, kernel_size[1] * uf, Ly * Lx))
 
@@ -927,6 +928,7 @@ class LatentDiffusion(DDPM):
             cond = {key: cond}
 
         if hasattr(self, "split_input_params"):
+            print("debug: in apply_model, split_input_params")
             assert len(cond) == 1  # todo can only deal with one conditioning atm
             assert not return_ids  
             ks = self.split_input_params["ks"]  # eg. (128, 128)
