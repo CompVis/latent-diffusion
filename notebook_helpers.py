@@ -109,22 +109,33 @@ def select_cond_path(mode):
     selected_path = os.path.join(path, selected.value)
     return selected_path
 
-
-def get_cond(mode, selected_path, up_f=4):
+from ldm.modules.image_degradation.bsrgan import degradation_bsrgan_variant as degradation_fn_bsr
+from ldm.modules.image_degradation.bsrgan import partial
+def get_cond(mode, selected_path, up_f=4, sf = 32, downsample = True, img_idx = 1):
     example = dict()
     if mode == "superresolution":
         # up_f = 4
         # up_f = 2
-        visualize_cond_img(selected_path)
+        # visualize_cond_img(selected_path) # turn off for now
 
         # c = Image.open(selected_path)
         c = cv2.imread(selected_path)
         c = cv2.cvtColor(c, cv2.COLOR_BGR2RGB)
+        origin = None
+        if downsample:
+            # origin = cv2.resize(c, (256, 256), cv2.INTER_CUBIC) # from 1024 to 256
+            c = cv2.resize(c, (32, 32), cv2.INTER_CUBIC) # from 1024 to 32
+            # c = cv2.resize(c, (64, 64), cv2.INTER_CUBIC) # from 1024 to 64 # FIXME: change to 32
+            # c = partial(degradation_fn_bsr, sf = sf)(c)["image"] # from 1024 to 32
+        display(Image.fromarray(c))
+        # Image.fromarray(c).save(f".\\data\\ffhq\\generated_img\\conditioned_img64\\conditioned-{img_idx}.png")
+        # Store original image downscale to 256
+        if origin is not None:
+            Image.fromarray(origin).save(f".\\data\\ffhq\\generated_img\\conditioned_img64\\origin-{img_idx}.png")
         # print("raw image c shape:", c.size)
         # c = c.convert("RGB") # three channel
         c = torch.unsqueeze(torchvision.transforms.ToTensor()(c), 0)
-        print("heyeheyhey")
-        print("original c shape:", c.shape); print("heyeheyhey")
+        print("original c shape:", c.shape)
         c_up = torchvision.transforms.functional.resize(c, size=[up_f * c.shape[2], up_f * c.shape[3]], antialias=True)
         c_up = rearrange(c_up, '1 c h w -> 1 h w c')
         c = rearrange(c, '1 c h w -> 1 h w c')
@@ -142,9 +153,9 @@ def visualize_cond_img(path):
     display(ipyimg(filename=path))
 
 
-def run(model, selected_path, task, custom_steps, up_f, resize_enabled=False, classifier_ckpt=None, global_step=None):
+def run(model, selected_path, task, custom_steps, up_f, resize_enabled=False, classifier_ckpt=None, global_step=None, downsample = True, img_idx = 1):
 
-    example = get_cond(task, selected_path, up_f)
+    example = get_cond(task, selected_path, up_f, downsample = downsample, img_idx = img_idx)
 
     save_intermediate_vid = False
     n_runs = 1
