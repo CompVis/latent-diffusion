@@ -21,18 +21,19 @@ model:
         out_channels: 3
         model_channels: 160
         attention_resolutions:
-        - 16
-        - 8
+          - 16
+          - 8
         num_res_blocks: 2
         channel_mult:
-        - 1
-        - 2
-        - 2
-        - 4
+          - 1
+          - 2
+          - 2
+          - 4
         num_head_channels: 32
     first_stage_config:
       target: ldm.models.autoencoder.VQModelInterface
       params:
+        ckpt_path: ./models/first_stage_models/vq-f4/model.ckpt
         embed_dim: 3
         n_embed: 8192
         monitor: val/rec_loss
@@ -44,9 +45,9 @@ model:
           out_ch: 3
           ch: 128
           ch_mult:
-          - 1
-          - 2
-          - 4
+            - 1
+            - 2
+            - 4
           num_res_blocks: 2
           attn_resolutions: []
           dropout: 0.0
