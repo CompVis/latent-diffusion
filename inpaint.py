@@ -25,17 +25,17 @@ def draw_circle(event, x, y, flags, param):
         ix, iy = x, y
     elif event == cv2.EVENT_MOUSEMOVE:
         if drawing==True:
-            cv2.circle(img, (x,y), 20, (0,0,0), -1)
-            cv2.circle(mask, (x,y), 20, (0,0,0), -1)    
+            cv2.circle(img, (x,y), 12, (0,0,0), -1)
+            cv2.circle(mask, (x,y), 12, (0,0,0), -1)    
     elif event == cv2.EVENT_LBUTTONUP:
         drawing = False
-        cv2.circle(img, (x,y), 20, (0,0,0), -1)
-        cv2.circle(mask, (x,y), 20, (0,0,0), -1)
+        cv2.circle(img, (x,y), 12, (0,0,0), -1)
+        cv2.circle(mask, (x,y), 12, (0,0,0), -1)
         
 #%%
 
 STEPS = 50
-IMG_PATH = "data/inpainting_examples/6458524847_2f4c361183_k.png"
+IMG_PATH = "data/avikus_sample/ship5.jpg"
 OUTPUT_PATH = "outputs"
 
 os.makedirs(OUTPUT_PATH, exist_ok=True)
@@ -44,24 +44,25 @@ config = OmegaConf.load('models/ldm/inpainting_big/config.yaml')
 model = instantiate_from_config(config.model)
 model.load_state_dict(torch.load('models/ldm/inpainting_big/last.ckpt')['state_dict'], strict=False)
 
-# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-device = torch.device('cpu')
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+# device = torch.device('cpu')
 model = model.to(device)
 sampler = DDIMSampler(model)
+
+#%%
 
 img = cv2.imread(IMG_PATH)
 
 # Center crop
 # image size must be 512
+print(f" img shape: {img.shape}")
 if img.shape[0] < img.shape[1]: # height < width
     # width, height
-    img = cv2.resize(img, int(512 / img.shape[0] * img.shape[1], 512))
+    img = cv2.resize(img, (int(512 / img.shape[0] * img.shape[1]), 512))
 else:
     img = cv2.resize(img, (512, int(512 / img.shape[1] * img.shape[0])))
 
 img = albumentations.CenterCrop(height=512, width=512)(image=img)['image']
-
-#%%
 
 img_ori = img.copy()
 mask = np.ones(shape=(img.shape[0], img.shape[1]), dtype=np.float32)
@@ -80,6 +81,7 @@ while True:
         img = img_ori.copy()
         mask = np.ones(shape=(img.shape[0], img.shape[1]), dtype=np.float32)
     elif key == ord('w'):
+        masked_img_np = img.copy()
         masked_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         masked_img = masked_img.astype(np.float32) / 255.
         masked_img = np.expand_dims(masked_img, axis=0)
@@ -119,6 +121,11 @@ while True:
             inpainted_img = inpainted_img.astype(np.uint8)
             
             cv2.imshow('output', inpainted_img)
+
+        img_name = os.path.splitext(os.path.basename(IMG_PATH))[0]
+        cat = cv2.hconcat([img_ori, masked_img_np, inpainted_img])
+        save_name = os.path.join(OUTPUT_PATH, f"result_{img_name}.jpg")
+        cv2.imwrite(save_name, cat)
                                          
 cv2.destroyAllWindows()
 # %%
