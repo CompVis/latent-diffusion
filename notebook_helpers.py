@@ -127,11 +127,12 @@ def get_cond(mode, selected_path, up_f=4, sf = 32, downsample = True, img_idx = 
             c = cv2.resize(c, (32, 32), cv2.INTER_CUBIC) # from 1024 to 32
             # c = cv2.resize(c, (64, 64), cv2.INTER_CUBIC) # from 1024 to 64 # FIXME: change to 32
             # c = partial(degradation_fn_bsr, sf = sf)(c)["image"] # from 1024 to 32
-        display(Image.fromarray(c))
+        # display(Image.fromarray(c))
         # Image.fromarray(c).save(f".\\data\\ffhq\\generated_img\\conditioned_img64\\conditioned-{img_idx}.png")
         # Store original image downscale to 256
         if origin is not None:
-            Image.fromarray(origin).save(f".\\data\\ffhq\\generated_img\\conditioned_img64\\origin-{img_idx}.png")
+            pass
+            # Image.fromarray(origin).save(f".\\data\\ffhq\\generated_img\\conditioned_img64\\origin-{img_idx}.png")
         # print("raw image c shape:", c.size)
         # c = c.convert("RGB") # three channel
         c = torch.unsqueeze(torchvision.transforms.ToTensor()(c), 0)
