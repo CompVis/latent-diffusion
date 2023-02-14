@@ -1,4 +1,5 @@
 # from 32 -> 256 ffhq config (adapted from bsr_sr, official source config superresolution)
+# epoch=000230.ckpt + 38 = epoch=000268.ckpt
 model:
   base_learning_rate: 1.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion

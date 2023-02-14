@@ -1,4 +1,5 @@
 # from 64 -> 256 ffhq config (adapted from bsr_sr, official source config superresolution)
+# epoch 52 + 26 = 78
 model:
   base_learning_rate: 1.0e-06
   target: ldm.models.diffusion.ddpm.LatentDiffusion
