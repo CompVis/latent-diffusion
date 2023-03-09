@@ -55,7 +55,7 @@ To get started, install the additionally required python packages into your `ldm
 pip install transformers==4.19.2 scann kornia==0.6.4 torchmetrics==0.6.0
 pip install git+https://github.com/arogozhnikov/einops.git
 ```
-and download the trained weights (preliminary ceckpoints):
+and download the trained weights (preliminary checkpoints):
 
 ```bash
 mkdir -p models/rdm/rdm768x768/
