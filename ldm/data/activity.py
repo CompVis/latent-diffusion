@@ -45,8 +45,6 @@ import glob
 import itertools
 import random
 import math
-import os
-os.environ['OMP_NUM_THREADS'] = '1'
 
 def resize_image(image,dim):
     image = cv2.resize(image,(dim,dim))
