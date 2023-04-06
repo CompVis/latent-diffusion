@@ -138,7 +138,7 @@ class SpatialRescaler(nn.Module):
     def forward(self,x):
         if not x.shape[2] == x.shape[3]:
             x = self.same_size(self,x)
-        multipliers = self.multiplier(self.dim,x.shape[2],self.n_stages)
+        multipliers = self.multiplier(self.dim,x.shape[2])
         for stage in range(self.n_stages):
             x = self.interpolator(x, scale_factor=multipliers)
         x = self.interpolator(x, size=x.shape[2])
