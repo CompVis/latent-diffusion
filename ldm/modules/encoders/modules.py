@@ -123,8 +123,8 @@ class SpatialRescaler(nn.Module):
             print(f'Spatial Rescaler mapping from {in_channels} to {out_channels} channels after resizing.')
             self.channel_mapper = nn.Conv2d(in_channels,out_channels,1,bias=bias)
             
-    def multiplier(self,in_dim,out_dim,n_stages):
-        multipliers = (out_dim / in_dim) ** (1 / n_stages)
+    def multiplier(self,in_dim,out_dim):
+        multipliers = (out_dim / in_dim) ** (1 / self.n_stages)
         return multipliers
     
     def same_size(self,x):
