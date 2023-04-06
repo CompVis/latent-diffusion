@@ -128,7 +128,7 @@ class SpatialRescaler(nn.Module):
         return multipliers
     
     def same_size(self,x):
-        multipliers = self.multiplier(x.shape[2],x.shape[3],self.n_stages)
+        multipliers = self.multiplier(x.shape[2],x.shape[3])
         # Scale the tensor for each stage
         for stage in range(self.n_stages):
             x = self.interpolator(x, scale_factor=(1,multipliers))
