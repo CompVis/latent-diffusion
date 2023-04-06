@@ -107,25 +107,39 @@ class SpatialRescaler(nn.Module):
     def __init__(self,
                  n_stages=1,
                  method='bilinear',
-                 multiplier=0.5,
+                 #multiplier=0.5,
+                 dim=64,
                  in_channels=3,
                  out_channels=None,
                  bias=False):
         super().__init__()
         self.n_stages = n_stages
+        self.dim = dim
         assert self.n_stages >= 0
         assert method in ['nearest','linear','bilinear','trilinear','bicubic','area']
-        self.multiplier = multiplier
         self.interpolator = partial(torch.nn.functional.interpolate, mode=method)
         self.remap_output = out_channels is not None
         if self.remap_output:
             print(f'Spatial Rescaler mapping from {in_channels} to {out_channels} channels after resizing.')
             self.channel_mapper = nn.Conv2d(in_channels,out_channels,1,bias=bias)
-
-    def forward(self,x):
+            
+    def multiplier(self,in_dim,out_dim,n_stages):
+        multipliers = (out_dim / in_dim) ** (1 / n_stages)
+        return multipliers
+    
+    def same_size(self,x):
+        multipliers = self.multiplier(x.shape[2],x.shape[3],self.n_stages)
+        # Scale the tensor for each stage
         for stage in range(self.n_stages):
-            x = self.interpolator(x, scale_factor=self.multiplier)
-
+            x = self.interpolator(x, scale_factor=(1,multipliers))
+        x = self.interpolator(x, size=x.shape[2])
+        return x
+    
+    def forward(self,x,dim):
+        multipliers = self.multiplier(dim,x.shape[2],self.n_stages)
+        for stage in range(self.n_stages):
+            x = self.interpolator(x, scale_factor=multipliers)
+        x = self.interpolator(x, size=x.shape[2])
 
         if self.remap_output:
             x = self.channel_mapper(x)
