@@ -45,6 +45,7 @@ import glob
 import itertools
 import random
 import math
+import os
 
 def resize_image(image,dim):
     image = cv2.resize(image,(dim,dim))
@@ -145,7 +146,7 @@ class MriActivityBase(Dataset):
         stim_type = glob.glob(stim_root + "*")
         stim_path = {}
         for item in stim_type:
-            stim_path[item.split("\\")[1]] = item
+            stim_path[item.split(stim_root)[1]] = item
         return stim_path
     
     def __getitem__(self, i):    
@@ -168,13 +169,13 @@ class MriActivityBase(Dataset):
                                 
 class activityTrain(MriActivityBase):
     def __init__(self, **kwargs):
-        super().__init__(data_root = 'F:/',stim_root = 'C:/Users/Hp/Desktop/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/',subjects = ["CSI1","CSI2","CSI3","CSI4"], img_dim=None)
+        super().__init__(data_root = '/content/drive/MyDrive/BOLD5000/',stim_root = '/content/drive/MyDrive/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/',subjects = ["CSI1","CSI2","CSI3","CSI4"], img_dim=None)
 
 class activityValidation(MriActivityBase):
     def __init__(self, **kwargs):
-        super().__init__(data_root = 'F:/',stim_root = 'C:/Users/Hp/Desktop/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/',subjects = ["CSI1","CSI2","CSI3","CSI4"], img_dim=None)
+        super().__init__(data_root = '/content/drive/MyDrive/BOLD5000/',stim_root = '/content/drive/MyDrive/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/',subjects = ["CSI1","CSI2","CSI3","CSI4"], img_dim=None)
 
 class activityTest(MriActivityBase):
     def __init__(self, **kwargs):
-        super().__init__(data_root = 'F:/',stim_root = 'C:/Users/Hp/Desktop/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/',subjects = ["CSI1","CSI2","CSI3","CSI4"], img_dim=None)
+        super().__init__(data_root = '/content/drive/MyDrive/BOLD5000/',stim_root = '/content/drive/MyDrive/BOLD5000_Stimuli/Scene_Stimuli/Presented_Stimuli/',subjects = ["CSI1","CSI2","CSI3","CSI4"], img_dim=None)
 
