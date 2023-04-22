@@ -143,13 +143,13 @@ class VQModel(pl.LightningModule):
         # https://github.com/pytorch/pytorch/issues/37142
         # try not to fool the heuristics
         x = self.get_input(batch, self.image_key)
-        xrec, qloss, ind = self(x, return_pred_indices=True)
+        xrec, qloss = self(x, return_pred_indices=False)
 
         if optimizer_idx == 0:
             # autoencode
             aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                             last_layer=self.get_last_layer(), split="train",
-                                            predicted_indices=ind)
+                                            )
 
             self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
             return aeloss
@@ -169,7 +169,7 @@ class VQModel(pl.LightningModule):
 
     def _validation_step(self, batch, batch_idx, suffix=""):
         x = self.get_input(batch, self.image_key)
-        xrec, qloss, ind = self(x, return_pred_indices=True)
+        xrec, qloss = self(x, return_pred_indices=False)
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0,
                                         self.global_step,
                                         last_layer=self.get_last_layer(),
@@ -188,8 +188,8 @@ class VQModel(pl.LightningModule):
                    prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
         self.log(f"val{suffix}/aeloss", aeloss,
                    prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
-        if version.parse(pl.__version__) >= version.parse('1.4.0'):
-            del log_dict_ae[f"val{suffix}/rec_loss"]
+
+        del log_dict_ae[f"val{suffix}/rec_loss"]
         self.log_dict(log_dict_ae)
         self.log_dict(log_dict_disc)
         return self.log_dict
