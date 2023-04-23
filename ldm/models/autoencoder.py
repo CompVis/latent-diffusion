@@ -179,7 +179,7 @@ class VQModel(pl.LightningModule):
         discloss, log_dict_disc = self.loss(qloss, x, xrec, 1,
                                             self.global_step,
                                             last_layer=self.get_last_layer(),
-                                            split="val"+suffix,
+                                            split="val"+suffix
                                             )
         rec_loss = log_dict_ae[f"val{suffix}/rec_loss"]
         self.log(f"val{suffix}/rec_loss", rec_loss,
