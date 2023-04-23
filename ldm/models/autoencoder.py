@@ -180,7 +180,6 @@ class VQModel(pl.LightningModule):
                                             self.global_step,
                                             last_layer=self.get_last_layer(),
                                             split="val"+suffix,
-                                            predicted_indices=ind
                                             )
         rec_loss = log_dict_ae[f"val{suffix}/rec_loss"]
         self.log(f"val{suffix}/rec_loss", rec_loss,
