@@ -120,17 +120,6 @@ class MriActivityBase(Dataset):
                 for key in self.data:
                     del self.data[key][index]
         
-        if self.subDataset is not None:
-            delete_indices = []
-            self.subDataset = self.subDataset.lower()
-            for index, item in enumerate(self.data["file_path_"]):
-                if subDataset not in item.lower():
-                    delete_indices.append(index)
-            delete_indices.sort(reverse=True)
-            for index in delete_indices:
-                for key in self.data:
-                    del self.data[key][index]
-        
         self.data["relative_file_path_"], self.data["file_path_"] = self.getNamefor(self)
 
         combined = list(zip(self.data["file_path_"] , self.data["relative_file_path_"]))
