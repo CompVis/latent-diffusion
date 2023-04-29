@@ -58,6 +58,7 @@ def convert_rgb(image):
 def filter_list(directory,list_for):
     directory = list(filter(lambda item: list_for in item, directory))
     return directory
+
 def flat_paths(directory):
     directory = list(itertools.chain(*directory))
     return directory
@@ -109,6 +110,7 @@ class MriActivityBase(Dataset):
         self.data["file_path_"] = scene
         self.data["relative_file_path_"] = [run[x:x+5] for run in [ses[3:188] for ses in self.parent_dir] for x in range(0, len(run),5)]
         
+        subDataset = "ImageNet"
         if subDataset is not None:
             delete_indices = []
             subDataset = subDataset.lower()
@@ -118,7 +120,14 @@ class MriActivityBase(Dataset):
             delete_indices.sort(reverse=True)
             for index in delete_indices:
                 for key in self.data:
-                    del self.data[key][index]
+                    self.data[key][index] = ""
+        
+            for key in self.data:
+                new_list = []
+                for item in self.data[key]:
+                    if item != "":
+                        new_list.append(item)
+                self.data[key] = new_list
         
         self.data["relative_file_path_"], self.data["file_path_"] = self.getNamefor(self)
 
@@ -126,13 +135,13 @@ class MriActivityBase(Dataset):
         random.seed(1234)
         random.shuffle(combined)
         self.data["file_path_"], self.data["relative_file_path_"] = zip(*combined)
+        
         # start fixation cross - 6 secs
         # end fixation cross -12 secs
         # acqusition time - 2 secs
         # hemodynamic response about 5 slices (10 secs)
         # Eliminate start and end fixation cross in each run
         
-    
     def __len__(self):
         return len(self.data["relative_file_path_"])
     
@@ -180,8 +189,7 @@ class MriActivityBase(Dataset):
     def __getitem__(self, i):    
         #image = {key : cv2.resize(np.load(key,allow_pickle=True),(512,512)) for key in self.data["file_path_"][i]}  
         image = {key : np.load(key,allow_pickle=True) for key in self.data["relative_file_path_"][i]}  
-        path_label = self.data["file_path_"][i]
-        stimulus = cv2.imread(path_label)
+        stimulus = cv2.imread(self.data["file_path_"][i])
         stimulus = convert_rgb(stimulus)
         stimulus = resize_image(stimulus,self.img_dim)
         example = {
@@ -194,6 +202,8 @@ class MriActivityBase(Dataset):
             }
         
         return example
+                               
+
                                 
 class activityTrain(MriActivityBase):
     def __init__(self, **kwargs):
