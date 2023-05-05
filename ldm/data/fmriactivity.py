@@ -131,10 +131,11 @@ class MriActivityBase(Dataset):
         
         self.data["relative_file_path_"], self.data["file_path_"] = self.getNamefor(self)
 
-        combined = list(zip(self.data["file_path_"] , self.data["relative_file_path_"]))
-        random.seed(1234)
-        random.shuffle(combined)
-        self.data["file_path_"], self.data["relative_file_path_"] = zip(*combined)
+        # shuffle
+        #combined = list(zip(self.data["file_path_"] , self.data["relative_file_path_"]))
+        #random.seed(1234)
+        #random.shuffle(combined)
+        #self.data["file_path_"], self.data["relative_file_path_"] = zip(*combined)
         
         # start fixation cross - 6 secs
         # end fixation cross -12 secs
@@ -195,9 +196,9 @@ class MriActivityBase(Dataset):
         example = {
             "image" : stimulus,
             "activity" : np.array(list(image.values())).transpose(1,2,0),
-            "relative_file_path_" : list(image.keys()),
+            #"relative_file_path_" : list(image.keys()),
             #"paths_hemodynamic_response" : list(image.keys()),
-            "file_path_" : self.data["file_path_"][i]
+            #"file_path_" : self.data["file_path_"][i]
             #"path_label" : path_label 
             }
         
