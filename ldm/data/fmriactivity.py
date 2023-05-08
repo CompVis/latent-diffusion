@@ -130,6 +130,7 @@ class MriActivityBase(Dataset):
                 self.data[key] = new_list
         
         self.data["relative_file_path_"], self.data["file_path_"] = self.getNamefor(self)
+        self._length = len(self.data["relative_file_path_"])
 
         # shuffle
         #combined = list(zip(self.data["file_path_"] , self.data["relative_file_path_"]))
@@ -144,7 +145,7 @@ class MriActivityBase(Dataset):
         # Eliminate start and end fixation cross in each run
         
     def __len__(self):
-        return len(self.data["relative_file_path_"])
+        return self._length
     
     def getNamefor(self, data):
         start = 0
