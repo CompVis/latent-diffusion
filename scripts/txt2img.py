@@ -133,7 +133,7 @@ if __name__ == "__main__":
                 uc = model.get_learned_conditioning(opt.n_samples * [""])
             for n in trange(opt.n_iter, desc="Sampling"):
                 c = model.get_learned_conditioning(opt.n_samples * [prompt])
-                shape = [4, opt.H//8, opt.W//8]
+                shape = [3, opt.H//8, opt.W//8]
                 samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
                                                  conditioning=c,
                                                  batch_size=opt.n_samples,
