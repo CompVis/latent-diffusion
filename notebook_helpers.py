@@ -23,14 +23,14 @@ def download_models(mode):
         url_conf = 'https://heibox.uni-heidelberg.de/f/31a76b13ea27482981b4/?dl=1'
         url_ckpt = 'https://heibox.uni-heidelberg.de/f/578df07c8fc04ffbadf3/?dl=1'
 
-        path_conf = 'logs/diffusion/superresolution_bsr/configs/project.yaml'
-        path_ckpt = 'logs/diffusion/superresolution_bsr/checkpoints/last.ckpt'
+        path_conf, name_conf = os.path.split('logs/diffusion/superresolution_bsr/configs/project.yaml')
+        path_ckpt, name_ckpt = os.path.split('logs/diffusion/superresolution_bsr/checkpoints/last.ckpt')
 
-        download_url(url_conf, path_conf)
-        download_url(url_ckpt, path_ckpt)
+        download_url(url_conf, path_conf, filename=name_conf)
+        download_url(url_ckpt, path_ckpt, filename=name_ckpt)
 
-        path_conf = path_conf + '/?dl=1' # fix it
-        path_ckpt = path_ckpt + '/?dl=1' # fix it
+        path_conf = os.path.join(path_conf, name_conf)
+        path_ckpt = os.path.join(path_ckpt, name_ckpt)
         return path_conf, path_ckpt
 
     else:
