@@ -248,6 +248,28 @@ where `config_spec` is one of {`autoencoder_kl_8x8x64`(f=32, d=64), `autoencoder
 For training VQ-regularized models, see the [taming-transformers](https://github.com/CompVis/taming-transformers) 
 repository.
 
+### Evaluation of trained autoencoder models
+
+1. generate an evaluation dataset
+```
+python scripts/create_eval_data.py /mnt/disks/datasets/celeba-hq ./eval_data ./data/celebahqvalidation_jpg.txt
+```
+2. generate reconstructed images from autoencoder models
+```
+python scripts/reconstruct_first_stages.py \
+--config ./models/first_stage_models/kl-f4/config.yaml \
+--ckpt ./models/first_stage_models/kl-f4/model.ckpt \
+--input_dir  ./eval_data \
+--output_dir ./reconstructed_images_pretrain
+```
+3. compute metrics for original images and reconstructed_images
+```
+python scripts/evaluate_first_stages.py \
+--original_dir ./eval_data \
+--reconstructed_dir1 ./reconstructed_images_pretrain \
+--reconstructed_dir2 ./reconstructed_images_train200
+```
+
 ### Training LDMs 
 
 In ``configs/latent-diffusion/`` we provide configs for training LDMs on the LSUN-, CelebA-HQ, FFHQ and ImageNet datasets. 
