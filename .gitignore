@@ -1,0 +1,12 @@
+**/__pycache__/**
+**/.ipynb_checkpoints/**
+.DS_Store
+
+logs/
+wandb/
+taming/
+src/
+=0.7.5
+*.ckpt
+*.log
+*.png

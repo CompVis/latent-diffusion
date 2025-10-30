@@ -1,0 +1,1 @@
+python3 main.py --base configs/autoencoder/autoencoder_kl_16x16x16.yaml

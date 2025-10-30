@@ -148,21 +148,25 @@ class ImageNetTrain(ImageNetBase):
         super().__init__(**kwargs)
 
     def _prepare(self):
-        if self.data_root:
-            self.root = os.path.join(self.data_root, self.NAME)
-        else:
-            cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-            self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
-
-        self.datadir = os.path.join(self.root, "data")
-        self.txt_filelist = os.path.join(self.root, "filelist.txt")
+        # if self.data_root:
+        #    self.root = os.path.join(self.data_root, self.NAME)
+        # else:
+        #    cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+        #    self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
+        # self.datadir = os.path.join(self.root, "data")
+        # self.txt_filelist = os.path.join(self.root, "filelist.txt")
+        self.root = '/path/to/imagenet-1k'
+        self.datadir = os.path.join(self.root, 'train')
+        self.txt_filelist = os.path.join(self.root, 'train-txt', 'filelist.txt')
         self.expected_length = 1281167
         self.random_crop = retrieve(self.config, "ImageNetTrain/random_crop",
                                     default=True)
-        if not tdu.is_prepared(self.root):
+        
+        # if not tdu.is_prepared(self.root):
+        if not tdu.is_prepared(os.path.join(self.root, 'train-txt')):
             # prep
             print("Preparing dataset {} in {}".format(self.NAME, self.root))
-
+            
             datadir = self.datadir
             if not os.path.exists(datadir):
                 path = os.path.join(self.root, self.FILES[0])
@@ -183,7 +187,7 @@ class ImageNetTrain(ImageNetBase):
                     os.makedirs(subdir, exist_ok=True)
                     with tarfile.open(subpath, "r:") as tar:
                         tar.extractall(path=subdir)
-
+            
             filelist = glob.glob(os.path.join(datadir, "**", "*.JPEG"))
             filelist = [os.path.relpath(p, start=datadir) for p in filelist]
             filelist = sorted(filelist)
@@ -191,7 +195,8 @@ class ImageNetTrain(ImageNetBase):
             with open(self.txt_filelist, "w") as f:
                 f.write(filelist)
 
-            tdu.mark_prepared(self.root)
+            # tdu.mark_prepared(self.root)
+            tdu.mark_prepared(os.path.join(self.root, 'train-txt'))
 
 
 class ImageNetValidation(ImageNetBase):
@@ -214,17 +219,22 @@ class ImageNetValidation(ImageNetBase):
         super().__init__(**kwargs)
 
     def _prepare(self):
-        if self.data_root:
-            self.root = os.path.join(self.data_root, self.NAME)
-        else:
-            cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-            self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
-        self.datadir = os.path.join(self.root, "data")
-        self.txt_filelist = os.path.join(self.root, "filelist.txt")
+        # if self.data_root:
+        #    self.root = os.path.join(self.data_root, self.NAME)
+        # else:
+        #    cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+        #    self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
+        # self.datadir = os.path.join(self.root, "data")
+        # self.txt_filelist = os.path.join(self.root, "filelist.txt")
+        self.root = '/path/to/imagenet-1k'
+        self.datadir = os.path.join(self.root, 'val')
+        self.txt_filelist = os.path.join(self.root, 'val-txt', 'filelist.txt')
         self.expected_length = 50000
         self.random_crop = retrieve(self.config, "ImageNetValidation/random_crop",
                                     default=False)
-        if not tdu.is_prepared(self.root):
+        
+        # if not tdu.is_prepared(self.root):
+        if not tdu.is_prepared(os.path.join(self.root, 'val-txt')):
             # prep
             print("Preparing dataset {} in {}".format(self.NAME, self.root))
 
@@ -265,8 +275,8 @@ class ImageNetValidation(ImageNetBase):
             with open(self.txt_filelist, "w") as f:
                 f.write(filelist)
 
-            tdu.mark_prepared(self.root)
-
+            # tdu.mark_prepared(self.root)
+            tdu.mark_prepared(os.path.join(self.root, 'val-txt'))
 
 
 class ImageNetSR(Dataset):

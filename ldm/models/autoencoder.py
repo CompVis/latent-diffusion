@@ -1,7 +1,12 @@
 import torch
+import torchvision
 import pytorch_lightning as pl
 import torch.nn.functional as F
+import numpy as np
+import wandb
+
 from contextlib import contextmanager
+from PIL import Image
 
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
@@ -305,10 +310,13 @@ class AutoencoderKL(pl.LightningModule):
         if colorize_nlabels is not None:
             assert type(colorize_nlabels)==int
             self.register_buffer("colorize", torch.randn(3, colorize_nlabels, 1, 1))
-        if monitor is not None:
-            self.monitor = monitor
-        if ckpt_path is not None:
-            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+        # if monitor is not None:
+        #    self.monitor = monitor
+        # if ckpt_path is not None:
+        #    self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+
+        # activates manual optimization for multiple optimizers
+        self.automatic_optimization = False
 
     def init_from_ckpt(self, path, ignore_keys=list()):
         sd = torch.load(path, map_location="cpu")["state_dict"]
@@ -348,40 +356,80 @@ class AutoencoderKL(pl.LightningModule):
         x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
         return x
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
+    def training_step(self, batch, batch_idx):
         inputs = self.get_input(batch, self.image_key)
         reconstructions, posterior = self(inputs)
 
-        if optimizer_idx == 0:
-            # train encoder+decoder+logvar
-            aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, optimizer_idx, self.global_step,
-                                            last_layer=self.get_last_layer(), split="train")
-            self.log("aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False)
-            return aeloss
+        opt_ae, opt_disc = self.optimizers()
 
-        if optimizer_idx == 1:
-            # train the discriminator
-            discloss, log_dict_disc = self.loss(inputs, reconstructions, posterior, optimizer_idx, self.global_step,
-                                                last_layer=self.get_last_layer(), split="train")
+        # train encoder+decoder+logvar
+        # adjust global step to match LR scheduler step: two optimizers -> two steps per iteration
+        ae_loss, log_dict_ae = self.loss(
+            inputs, reconstructions, posterior, 0, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="train"
+        )
 
-            self.log("discloss", discloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False)
-            return discloss
+        opt_ae.zero_grad()
+        self.manual_backward(ae_loss)
+        opt_ae.step()
+        
+        # train the discriminator
+        # adjust global step to match LR scheduler step: two optimizers -> two steps per iteration
+        disc_loss, log_dict_disc = self.loss(
+            inputs, reconstructions, posterior, 1, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="train"
+        )
+
+        opt_disc.zero_grad()
+        self.manual_backward(disc_loss)
+        opt_disc.step()
+
+        # log
+        for key, value in log_dict_ae.items():
+            self.log(key, value, sync_dist=True)
+        for key, value in log_dict_disc.items():
+            self.log(key, value, sync_dist=True)
 
     def validation_step(self, batch, batch_idx):
         inputs = self.get_input(batch, self.image_key)
         reconstructions, posterior = self(inputs)
-        aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, 0, self.global_step,
-                                        last_layer=self.get_last_layer(), split="val")
+        
+        # VAE
+        aeloss, log_dict_ae = self.loss(
+            inputs, reconstructions, posterior, 0, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="val",
+        )
 
-        discloss, log_dict_disc = self.loss(inputs, reconstructions, posterior, 1, self.global_step,
-                                            last_layer=self.get_last_layer(), split="val")
+        # Discriminator
+        discloss, log_dict_disc = self.loss(
+            inputs, reconstructions, posterior, 1, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="val",
+        )
 
-        self.log("val/rec_loss", log_dict_ae["val/rec_loss"])
-        self.log_dict(log_dict_ae)
-        self.log_dict(log_dict_disc)
-        return self.log_dict
+        # log
+        for key, value in log_dict_ae.items():
+            self.log(key, value, sync_dist=True)      
+        for key, value in log_dict_disc.items():
+            self.log(key, value, sync_dist=True)
+
+        # only plot one batch
+        if batch_idx == 0:
+            self.imgs = inputs
+            self.rec_imgs = reconstructions
+            self.posterior = posterior
+
+    def on_validation_epoch_end(self):
+        # reference images
+        if self.current_epoch == 0:
+            imgs = self.get_image_grid(self.imgs)
+            self.logger.experiment.log({'val_image/orig_imgs': wandb.Image(imgs)})
+        # reconstructed images
+        if self.current_epoch % 5 == 0:
+            rec_imgs = self.get_image_grid(self.rec_imgs)
+            sample_imgs = self.decode(torch.randn_like(self.posterior.sample()))
+            sample_imgs = self.get_image_grid(sample_imgs)
+            self.logger.experiment.log({'val_image/recon_imgs': wandb.Image(rec_imgs)})
+            self.logger.experiment.log({'val_image/sample_imgs': wandb.Image(sample_imgs)})
 
     def configure_optimizers(self):
         lr = self.learning_rate
@@ -396,6 +444,15 @@ class AutoencoderKL(pl.LightningModule):
 
     def get_last_layer(self):
         return self.decoder.conv_out.weight
+
+    def get_image_grid(self, imgs: torch.Tensor, nrow: int = 8, padding: int = 0) -> Image.Image:
+        """
+        Get a grid of images suitable for saving or visualization.
+        """
+        imgs = torch.clamp((imgs.detach() + 1) / 2, min=0, max=1)  # normalize to [0, 1]
+        imgs = torchvision.utils.make_grid(imgs, nrow=nrow, padding=padding)
+        imgs = imgs.permute(1, 2, 0).mul_(255).cpu().numpy()
+        return Image.fromarray(imgs.astype(np.uint8))
 
     @torch.no_grad()
     def log_images(self, batch, only_inputs=False, **kwargs):

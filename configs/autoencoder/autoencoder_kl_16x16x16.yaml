@@ -27,7 +27,7 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 12
+    batch_size: 16
     wrap: True
     train:
       target: ldm.data.imagenet.ImageNetSRTrain
@@ -51,4 +51,4 @@ lightning:
 
   trainer:
     benchmark: True
-    accumulate_grad_batches: 2
+    accumulate_grad_batches: 1

@@ -1,0 +1,600 @@
+import torch
+import torch.nn as nn
+import torchvision
+import pytorch_lightning as pl
+import torch.nn.functional as F
+import numpy as np
+import wandb
+
+from contextlib import contextmanager
+from PIL import Image
+from pytorch_wavelets import DWTForward, DWTInverse
+
+from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
+
+from ldm.modules.diffusionmodules.model import Encoder, Decoder
+from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
+
+from ldm.util import instantiate_from_config
+
+
+class VQModel(pl.LightningModule):
+    def __init__(self,
+                 ddconfig,
+                 lossconfig,
+                 n_embed,
+                 embed_dim,
+                 ckpt_path=None,
+                 ignore_keys=[],
+                 image_key="image",
+                 colorize_nlabels=None,
+                 monitor=None,
+                 batch_resize_range=None,
+                 scheduler_config=None,
+                 lr_g_factor=1.0,
+                 remap=None,
+                 sane_index_shape=False, # tell vector quantizer to return indices as bhw
+                 use_ema=False
+                 ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.n_embed = n_embed
+        self.image_key = image_key
+        self.encoder = Encoder(**ddconfig)
+        self.decoder = Decoder(**ddconfig)
+        self.loss = instantiate_from_config(lossconfig)
+        self.quantize = VectorQuantizer(n_embed, embed_dim, beta=0.25,
+                                        remap=remap,
+                                        sane_index_shape=sane_index_shape)
+        self.quant_conv = torch.nn.Conv2d(ddconfig["z_channels"], embed_dim, 1)
+        self.post_quant_conv = torch.nn.Conv2d(embed_dim, ddconfig["z_channels"], 1)
+        if colorize_nlabels is not None:
+            assert type(colorize_nlabels)==int
+            self.register_buffer("colorize", torch.randn(3, colorize_nlabels, 1, 1))
+        if monitor is not None:
+            self.monitor = monitor
+        self.batch_resize_range = batch_resize_range
+        if self.batch_resize_range is not None:
+            print(f"{self.__class__.__name__}: Using per-batch resizing in range {batch_resize_range}.")
+
+        self.use_ema = use_ema
+        if self.use_ema:
+            self.model_ema = LitEma(self)
+            print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")
+
+        if ckpt_path is not None:
+            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+        self.scheduler_config = scheduler_config
+        self.lr_g_factor = lr_g_factor
+
+    @contextmanager
+    def ema_scope(self, context=None):
+        if self.use_ema:
+            self.model_ema.store(self.parameters())
+            self.model_ema.copy_to(self)
+            if context is not None:
+                print(f"{context}: Switched to EMA weights")
+        try:
+            yield None
+        finally:
+            if self.use_ema:
+                self.model_ema.restore(self.parameters())
+                if context is not None:
+                    print(f"{context}: Restored training weights")
+
+    def init_from_ckpt(self, path, ignore_keys=list()):
+        sd = torch.load(path, map_location="cpu")["state_dict"]
+        keys = list(sd.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                if k.startswith(ik):
+                    print("Deleting key {} from state_dict.".format(k))
+                    del sd[k]
+        missing, unexpected = self.load_state_dict(sd, strict=False)
+        print(f"Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys")
+        if len(missing) > 0:
+            print(f"Missing Keys: {missing}")
+            print(f"Unexpected Keys: {unexpected}")
+
+    def on_train_batch_end(self, *args, **kwargs):
+        if self.use_ema:
+            self.model_ema(self)
+
+    def encode(self, x):
+        h = self.encoder(x)
+        h = self.quant_conv(h)
+        quant, emb_loss, info = self.quantize(h)
+        return quant, emb_loss, info
+
+    def encode_to_prequant(self, x):
+        h = self.encoder(x)
+        h = self.quant_conv(h)
+        return h
+
+    def decode(self, quant):
+        quant = self.post_quant_conv(quant)
+        dec = self.decoder(quant)
+        return dec
+
+    def decode_code(self, code_b):
+        quant_b = self.quantize.embed_code(code_b)
+        dec = self.decode(quant_b)
+        return dec
+
+    def forward(self, input, return_pred_indices=False):
+        quant, diff, (_,_,ind) = self.encode(input)
+        dec = self.decode(quant)
+        if return_pred_indices:
+            return dec, diff, ind
+        return dec, diff
+
+    def get_input(self, batch, k):
+        x = batch[k]
+        if len(x.shape) == 3:
+            x = x[..., None]
+        x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
+        if self.batch_resize_range is not None:
+            lower_size = self.batch_resize_range[0]
+            upper_size = self.batch_resize_range[1]
+            if self.global_step <= 4:
+                # do the first few batches with max size to avoid later oom
+                new_resize = upper_size
+            else:
+                new_resize = np.random.choice(np.arange(lower_size, upper_size+16, 16))
+            if new_resize != x.shape[2]:
+                x = F.interpolate(x, size=new_resize, mode="bicubic")
+            x = x.detach()
+        return x
+
+    def training_step(self, batch, batch_idx, optimizer_idx):
+        # https://github.com/pytorch/pytorch/issues/37142
+        # try not to fool the heuristics
+        x = self.get_input(batch, self.image_key)
+        xrec, qloss, ind = self(x, return_pred_indices=True)
+
+        if optimizer_idx == 0:
+            # autoencode
+            aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
+                                            last_layer=self.get_last_layer(), split="train",
+                                            predicted_indices=ind)
+
+            self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
+            return aeloss
+
+        if optimizer_idx == 1:
+            # discriminator
+            discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
+                                            last_layer=self.get_last_layer(), split="train")
+            self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
+            return discloss
+
+    def validation_step(self, batch, batch_idx):
+        log_dict = self._validation_step(batch, batch_idx)
+        with self.ema_scope():
+            log_dict_ema = self._validation_step(batch, batch_idx, suffix="_ema")
+        return log_dict
+
+    def _validation_step(self, batch, batch_idx, suffix=""):
+        x = self.get_input(batch, self.image_key)
+        xrec, qloss, ind = self(x, return_pred_indices=True)
+        aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0,
+                                        self.global_step,
+                                        last_layer=self.get_last_layer(),
+                                        split="val"+suffix,
+                                        predicted_indices=ind
+                                        )
+
+        discloss, log_dict_disc = self.loss(qloss, x, xrec, 1,
+                                            self.global_step,
+                                            last_layer=self.get_last_layer(),
+                                            split="val"+suffix,
+                                            predicted_indices=ind
+                                            )
+        rec_loss = log_dict_ae[f"val{suffix}/rec_loss"]
+        self.log(f"val{suffix}/rec_loss", rec_loss,
+                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"val{suffix}/aeloss", aeloss,
+                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+        if version.parse(pl.__version__) >= version.parse('1.4.0'):
+            del log_dict_ae[f"val{suffix}/rec_loss"]
+        self.log_dict(log_dict_ae)
+        self.log_dict(log_dict_disc)
+        return self.log_dict
+
+    def configure_optimizers(self):
+        lr_d = self.learning_rate
+        lr_g = self.lr_g_factor*self.learning_rate
+        print("lr_d", lr_d)
+        print("lr_g", lr_g)
+        opt_ae = torch.optim.Adam(list(self.encoder.parameters())+
+                                  list(self.decoder.parameters())+
+                                  list(self.quantize.parameters())+
+                                  list(self.quant_conv.parameters())+
+                                  list(self.post_quant_conv.parameters()),
+                                  lr=lr_g, betas=(0.5, 0.9))
+        opt_disc = torch.optim.Adam(self.loss.discriminator.parameters(),
+                                    lr=lr_d, betas=(0.5, 0.9))
+
+        if self.scheduler_config is not None:
+            scheduler = instantiate_from_config(self.scheduler_config)
+
+            print("Setting up LambdaLR scheduler...")
+            scheduler = [
+                {
+                    'scheduler': LambdaLR(opt_ae, lr_lambda=scheduler.schedule),
+                    'interval': 'step',
+                    'frequency': 1
+                },
+                {
+                    'scheduler': LambdaLR(opt_disc, lr_lambda=scheduler.schedule),
+                    'interval': 'step',
+                    'frequency': 1
+                },
+            ]
+            return [opt_ae, opt_disc], scheduler
+        return [opt_ae, opt_disc], []
+
+    def get_last_layer(self):
+        return self.decoder.conv_out.weight
+
+    def log_images(self, batch, only_inputs=False, plot_ema=False, **kwargs):
+        log = dict()
+        x = self.get_input(batch, self.image_key)
+        x = x.to(self.device)
+        if only_inputs:
+            log["inputs"] = x
+            return log
+        xrec, _ = self(x)
+        if x.shape[1] > 3:
+            # colorize with random projection
+            assert xrec.shape[1] > 3
+            x = self.to_rgb(x)
+            xrec = self.to_rgb(xrec)
+        log["inputs"] = x
+        log["reconstructions"] = xrec
+        if plot_ema:
+            with self.ema_scope():
+                xrec_ema, _ = self(x)
+                if x.shape[1] > 3: xrec_ema = self.to_rgb(xrec_ema)
+                log["reconstructions_ema"] = xrec_ema
+        return log
+
+    def to_rgb(self, x):
+        assert self.image_key == "segmentation"
+        if not hasattr(self, "colorize"):
+            self.register_buffer("colorize", torch.randn(3, x.shape[1], 1, 1).to(x))
+        x = F.conv2d(x, weight=self.colorize)
+        x = 2.*(x-x.min())/(x.max()-x.min()) - 1.
+        return x
+
+
+class VQModelInterface(VQModel):
+    def __init__(self, embed_dim, *args, **kwargs):
+        super().__init__(embed_dim=embed_dim, *args, **kwargs)
+        self.embed_dim = embed_dim
+
+    def encode(self, x):
+        h = self.encoder(x)
+        h = self.quant_conv(h)
+        return h
+
+    def decode(self, h, force_not_quantize=False):
+        # also go through quantization layer
+        if not force_not_quantize:
+            quant, emb_loss, info = self.quantize(h)
+        else:
+            quant = h
+        quant = self.post_quant_conv(quant)
+        dec = self.decoder(quant)
+        return dec
+
+
+class AutoencoderKL(pl.LightningModule):
+    def __init__(self,
+                 ddconfig,
+                 lossconfig,
+                 embed_dim,
+                 ckpt_path=None,
+                 ignore_keys=[],
+                 image_key="image",
+                 colorize_nlabels=None,
+                 monitor=None,
+                 ):
+        super().__init__()
+        self.image_key = image_key
+        self.encoder = Encoder(**ddconfig)
+        self.decoder = Decoder(**ddconfig)
+        self.loss = instantiate_from_config(lossconfig)
+        assert ddconfig["double_z"]
+        self.quant_conv = torch.nn.Conv2d(2*ddconfig["z_channels"], 2*embed_dim, 1)
+        self.post_quant_conv = torch.nn.Conv2d(embed_dim, ddconfig["z_channels"], 1)
+        self.embed_dim = embed_dim
+        if colorize_nlabels is not None:
+            assert type(colorize_nlabels)==int
+            self.register_buffer("colorize", torch.randn(3, colorize_nlabels, 1, 1))
+        # if monitor is not None:
+        #    self.monitor = monitor
+        # if ckpt_path is not None:
+        #    self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+
+        # wavelet decomposition
+        self.dwt = DWTForward(J=2, wave='haar', mode='zero')
+        self.idwt = DWTInverse(wave='haar', mode='zero')
+
+        self.downsample_wav = DownsampleWav(in_channels=9, out_channels=36) # (9, 128, 128) -> (36, 64, 64)
+        self.upsample_wav = UpsampleWav(in_channels=36, out_channels=9) # (36, 64, 64) -> (9, 128, 128)
+
+        # activates manual optimization for multiple optimizers
+        self.automatic_optimization = False
+
+    def init_from_ckpt(self, path, ignore_keys=list()):
+        sd = torch.load(path, map_location="cpu")["state_dict"]
+        keys = list(sd.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                if k.startswith(ik):
+                    print("Deleting key {} from state_dict.".format(k))
+                    del sd[k]
+        self.load_state_dict(sd, strict=False)
+        print(f"Restored from {path}")
+
+    def encode_wav(self, x):
+        ll2, (h1, h2) = self.dwt(x)
+        h1 = h1.view(h1.shape[0], -1, h1.shape[3], h1.shape[4]) # -> (N, C * 3, H, W)
+        h2 = h2.view(h2.shape[0], -1, h2.shape[3], h2.shape[4]) # -> (N, C * 3, H, W)
+        h1, h2, ll2 = h1 / 2, h2 / 4, ll2 / 4 # normalization
+        h1 = self.downsample_wav(h1) 
+        coeff = torch.cat([h1, h2, ll2], dim=1)
+        return coeff
+
+    def decode_wav(self, x):
+        rec_h1, rec_h2, rec_ll2 = x[:, 0:36], x[:, 36:45], x[:, 45:48]
+        rec_h1 = self.upsample_wav(rec_h1)
+        rec_h1, rec_h2, rec_ll2 = rec_h1 * 2, rec_h2 * 4, rec_ll2 * 4 # denormalization
+        rec_h1 = rec_h1.view(rec_h1.shape[0], 3, 3, rec_h1.shape[2], rec_h1.shape[3]) # -> (N, C, 3, H, W)
+        rec_h2 = rec_h2.view(rec_h2.shape[0], 3, 3, rec_h2.shape[2], rec_h2.shape[3]) # -> (N, C, 3, H, W)
+        rec_img = self.idwt((rec_ll2, [rec_h1, rec_h2]))
+        return rec_img
+    
+    def encode(self, x):
+        h = self.encoder(x)
+        moments = self.quant_conv(h)
+        posterior = DiagonalGaussianDistribution(moments)
+        return posterior
+
+    def decode(self, z):
+        z = self.post_quant_conv(z)
+        dec = self.decoder(z)
+        return dec
+
+    def forward(self, input, sample_posterior=True):
+        coeff = self.encode_wav(input)
+        posterior = self.encode(coeff)
+        if sample_posterior:
+            z = posterior.sample()
+        else:
+            z = posterior.mode()
+        dec = self.decode(z)
+        rec_img = self.decode_wav(dec)
+        return rec_img, posterior
+
+    def get_input(self, batch, k):
+        x = batch[k]
+        if len(x.shape) == 3:
+            x = x[..., None]
+        x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
+        return x
+
+    def training_step(self, batch, batch_idx):
+        inputs = self.get_input(batch, self.image_key)
+        reconstructions, posterior = self(inputs)
+
+        opt_ae, opt_disc = self.optimizers()
+
+        # train encoder+decoder+logvar
+        # adjust global step to match LR scheduler step: two optimizers -> two steps per iteration
+        ae_loss, log_dict_ae = self.loss(
+            inputs, reconstructions, posterior, 0, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="train"
+        )
+
+        opt_ae.zero_grad()
+        self.manual_backward(ae_loss)
+        opt_ae.step()
+        
+        # train the discriminator
+        # adjust global step to match LR scheduler step: two optimizers -> two steps per iteration
+        disc_loss, log_dict_disc = self.loss(
+            inputs, reconstructions, posterior, 1, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="train"
+        )
+
+        opt_disc.zero_grad()
+        self.manual_backward(disc_loss)
+        opt_disc.step()
+
+        # log
+        for key, value in log_dict_ae.items():
+            self.log(key, value, sync_dist=True)
+        for key, value in log_dict_disc.items():
+            self.log(key, value, sync_dist=True)
+
+    def validation_step(self, batch, batch_idx):
+        inputs = self.get_input(batch, self.image_key)
+        reconstructions, posterior = self(inputs)
+        
+        # VAE
+        aeloss, log_dict_ae = self.loss(
+            inputs, reconstructions, posterior, 0, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="val",
+        )
+
+        # Discriminator
+        discloss, log_dict_disc = self.loss(
+            inputs, reconstructions, posterior, 1, self.global_step // 2,
+            last_layer=self.get_last_layer(), split="val",
+        )
+
+        # log
+        for key, value in log_dict_ae.items():
+            self.log(key, value, sync_dist=True)      
+        for key, value in log_dict_disc.items():
+            self.log(key, value, sync_dist=True)
+
+        # only plot one batch
+        if batch_idx == 0:
+            self.imgs = inputs
+            ll2, (h1, h2) = self.dwt(inputs)
+            h1, h2, ll2 = h1 / 2, h2 / 4, ll2 / 4 # normalization
+            self.lh1 = h1[:, 0]
+            self.hl1 = h1[:, 1]
+            self.hh1 = h1[:, 2]
+            self.ll2 = ll2
+            self.lh2 = h2[:, 0]
+            self.hl2 = h2[:, 1]
+            self.hh2 = h2[:, 2]
+            self.rec_imgs = reconstructions
+            rec_ll2, (rec_h1, rec_h2) = self.dwt(reconstructions)
+            rec_h1, rec_h2, rec_ll2 = rec_h1 / 2, rec_h2 / 4, rec_ll2 / 4 # normalization
+            self.rec_lh1 = rec_h1[:, 0]
+            self.rec_hl1 = rec_h1[:, 1]
+            self.rec_hh1 = rec_h1[:, 2]
+            self.rec_ll2 = rec_ll2
+            self.rec_lh2 = rec_h2[:, 0]
+            self.rec_hl2 = rec_h2[:, 1]
+            self.rec_hh2 = rec_h2[:, 2]
+            self.posterior = posterior
+
+    def on_validation_epoch_end(self):
+        # reference images
+        if self.current_epoch == 0:
+            imgs = self.get_image_grid(self.imgs)
+            lh1 = self.get_image_grid(self.lh1)
+            hl1 = self.get_image_grid(self.hl1)
+            hh1 = self.get_image_grid(self.hh1)
+            ll2 = self.get_image_grid(self.ll2)
+            lh2 = self.get_image_grid(self.lh2)
+            hl2 = self.get_image_grid(self.hl2)
+            hh2 = self.get_image_grid(self.hh2)
+            self.logger.experiment.log({'val_image/orig_imgs': wandb.Image(imgs)})
+            self.logger.experiment.log({'val_image/orig_lh1': wandb.Image(lh1)})
+            self.logger.experiment.log({'val_image/orig_hl1': wandb.Image(hl1)})
+            self.logger.experiment.log({'val_image/orig_hh1': wandb.Image(hh1)})
+            self.logger.experiment.log({'val_image/orig_ll2': wandb.Image(ll2)})
+            self.logger.experiment.log({'val_image/orig_lh2': wandb.Image(lh2)})
+            self.logger.experiment.log({'val_image/orig_hl2': wandb.Image(hl2)})
+            self.logger.experiment.log({'val_image/orig_hh2': wandb.Image(hh2)})
+        # reconstructed images
+        if self.current_epoch % 5 == 0:
+            rec_imgs = self.get_image_grid(self.rec_imgs)
+            rec_lh1 = self.get_image_grid(self.rec_lh1)
+            rec_hl1 = self.get_image_grid(self.rec_hl1)
+            rec_hh1 = self.get_image_grid(self.rec_hh1)
+            rec_ll2 = self.get_image_grid(self.rec_ll2)
+            rec_lh2 = self.get_image_grid(self.rec_lh2)
+            rec_hl2 = self.get_image_grid(self.rec_hl2)
+            rec_hh2 = self.get_image_grid(self.rec_hh2)
+            dec = self.decode(torch.randn_like(self.posterior.sample()))
+            sample_imgs = self.decode_wav(dec)
+            sample_imgs = self.get_image_grid(sample_imgs)
+            self.logger.experiment.log({'val_image/recon_imgs': wandb.Image(rec_imgs)})
+            self.logger.experiment.log({'val_image/recon_lh1': wandb.Image(rec_lh1)})
+            self.logger.experiment.log({'val_image/recon_hl1': wandb.Image(rec_hl1)})
+            self.logger.experiment.log({'val_image/recon_hh1': wandb.Image(rec_hh1)})
+            self.logger.experiment.log({'val_image/recon_ll2': wandb.Image(rec_ll2)})
+            self.logger.experiment.log({'val_image/recon_lh2': wandb.Image(rec_lh2)})
+            self.logger.experiment.log({'val_image/recon_hl2': wandb.Image(rec_hl2)})
+            self.logger.experiment.log({'val_image/recon_hh2': wandb.Image(rec_hh2)})
+            self.logger.experiment.log({'val_image/sample_imgs': wandb.Image(sample_imgs)})
+
+    def configure_optimizers(self):
+        lr = self.learning_rate
+        opt_ae = torch.optim.Adam(list(self.encoder.parameters())+
+                                  list(self.decoder.parameters())+
+                                  list(self.quant_conv.parameters())+
+                                  list(self.post_quant_conv.parameters()),
+                                  lr=lr, betas=(0.5, 0.9))
+        opt_disc = torch.optim.Adam(self.loss.discriminator.parameters(),
+                                    lr=lr, betas=(0.5, 0.9))
+        return [opt_ae, opt_disc], []
+
+    def get_last_layer(self):
+        return self.decoder.conv_out.weight
+
+    def get_image_grid(self, imgs: torch.Tensor, nrow: int = 8, padding: int = 0) -> Image.Image:
+        """
+        Get a grid of images suitable for saving or visualization.
+        """
+        imgs = torch.clamp((imgs.detach() + 1) / 2, min=0, max=1)  # normalize to [0, 1]
+        imgs = torchvision.utils.make_grid(imgs, nrow=nrow, padding=padding)
+        imgs = imgs.permute(1, 2, 0).mul_(255).cpu().numpy()
+        return Image.fromarray(imgs.astype(np.uint8))
+
+    @torch.no_grad()
+    def log_images(self, batch, only_inputs=False, **kwargs):
+        log = dict()
+        x = self.get_input(batch, self.image_key)
+        x = x.to(self.device)
+        if not only_inputs:
+            xrec, posterior = self(x)
+            if x.shape[1] > 3:
+                # colorize with random projection
+                assert xrec.shape[1] > 3
+                x = self.to_rgb(x)
+                xrec = self.to_rgb(xrec)
+            log["samples"] = self.decode(torch.randn_like(posterior.sample()))
+            log["reconstructions"] = xrec
+        log["inputs"] = x
+        return log
+
+    def to_rgb(self, x):
+        assert self.image_key == "segmentation"
+        if not hasattr(self, "colorize"):
+            self.register_buffer("colorize", torch.randn(3, x.shape[1], 1, 1).to(x))
+        x = F.conv2d(x, weight=self.colorize)
+        x = 2.*(x-x.min())/(x.max()-x.min()) - 1.
+        return x
+
+
+class UpsampleWav(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.upconv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=4, stride=2, padding=1)  
+        self.channel_reduce = nn.Conv2d(in_channels, out_channels, kernel_size=1)  # Reduce channels 36 → 9
+
+    def forward(self, x):
+        x = self.upconv(x)  # Upsample spatially (64x64 → 128x128)
+        x = self.channel_reduce(x)  # Reduce channels (36 → 9)
+        return x
+
+
+class DownsampleWav(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=2, padding=1)  # Proper downsampling
+        self.channel_expand = nn.Conv2d(in_channels, out_channels, kernel_size=1)  # Adjust channels
+
+    def forward(self, x):
+        x = self.conv(x)  # Downsample spatially (128x128 → 64x64)
+        x = self.channel_expand(x)  # Adjust channels (9 → 36)
+        return x
+
+
+class IdentityFirstStage(torch.nn.Module):
+    def __init__(self, *args, vq_interface=False, **kwargs):
+        self.vq_interface = vq_interface  # TODO: Should be true by default but check to not break older stuff
+        super().__init__()
+
+    def encode(self, x, *args, **kwargs):
+        return x
+
+    def decode(self, x, *args, **kwargs):
+        return x
+
+    def quantize(self, x, *args, **kwargs):
+        if self.vq_interface:
+            return x, None, [None, None, None]
+        return x
+
+    def forward(self, x, *args, **kwargs):
+        return x
