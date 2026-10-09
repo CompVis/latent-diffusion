@@ -105,6 +105,8 @@ def checkpoint(func, inputs, params, flag):
     reduced memory at the expense of extra compute in the backward pass.
     :param func: the function to evaluate.
     :param inputs: the argument sequence to pass to `func`.
+                   Non-Tensor arguments and tensors that do not require
+                   gradients are preserved as constants during recomputation.
     :param params: a sequence of parameters `func` depends on but does not
                    explicitly take as arguments.
     :param flag: if False, disable gradient checkpointing.
@@ -129,18 +131,45 @@ class CheckpointFunction(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, *output_grads):
-        ctx.input_tensors = [x.detach().requires_grad_(True) for x in ctx.input_tensors]
+        ctx.input_tensors = [
+            x.detach().requires_grad_(x.requires_grad)
+            if isinstance(x, torch.Tensor) else x
+            for x in ctx.input_tensors
+        ]
         with torch.enable_grad():
             # Fixes a bug where the first op in run_function modifies the
             # Tensor storage in place, which is not allowed for detach()'d
             # Tensors.
-            shallow_copies = [x.view_as(x) for x in ctx.input_tensors]
+            shallow_copies = [
+                x.view_as(x) if isinstance(x, torch.Tensor) else x
+                for x in ctx.input_tensors
+            ]
             output_tensors = ctx.run_function(*shallow_copies)
-        input_grads = torch.autograd.grad(
-            output_tensors,
-            ctx.input_tensors + ctx.input_params,
-            output_grads,
-            allow_unused=True,
+        inputs = ctx.input_tensors + ctx.input_params
+        grad_inputs = [
+            x for x in inputs if isinstance(x, torch.Tensor) and x.requires_grad
+        ]
+        if isinstance(output_tensors, torch.Tensor):
+            output_tensors = (output_tensors,)
+        outputs_and_grads = [
+            (output, grad) for output, grad in zip(output_tensors, output_grads)
+            if isinstance(output, torch.Tensor) and output.requires_grad
+        ]
+        if grad_inputs and outputs_and_grads:
+            outputs, grad_outputs = zip(*outputs_and_grads)
+            grads = iter(
+                torch.autograd.grad(
+                    outputs,
+                    grad_inputs,
+                    grad_outputs,
+                    allow_unused=True,
+                )
+            )
+        else:
+            grads = iter([None] * len(grad_inputs))
+        input_grads = tuple(
+            next(grads) if isinstance(x, torch.Tensor) and x.requires_grad else None
+            for x in inputs
         )
         del ctx.input_tensors
         del ctx.input_params
