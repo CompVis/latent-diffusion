@@ -33,7 +33,10 @@ class DiagonalGaussianDistribution(object):
             self.var = self.std = torch.zeros_like(self.mean).to(device=self.parameters.device)
 
     def sample(self):
-        x = self.mean + self.std * torch.randn(self.mean.shape).to(device=self.parameters.device)
+        x = self.mean + self.std * torch.randn(self.mean.shape).to(
+            device=self.parameters.device,
+            dtype=self.mean.dtype if self.mean.is_floating_point() else None,
+        )
         return x
 
     def kl(self, other=None):
