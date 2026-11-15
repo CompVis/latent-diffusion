@@ -473,7 +473,6 @@ class LatentDiffusion(DDPM):
         ids = torch.round(torch.linspace(0, self.num_timesteps - 1, self.num_timesteps_cond)).long()
         self.cond_ids[:self.num_timesteps_cond] = ids
 
-    @rank_zero_only
     @torch.no_grad()
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
         # only for very first batch
@@ -485,8 +484,16 @@ class LatentDiffusion(DDPM):
             x = x.to(self.device)
             encoder_posterior = self.encode_first_stage(x)
             z = self.get_first_stage_encoding(encoder_posterior).detach()
-            del self.scale_factor
-            self.register_buffer('scale_factor', 1. / z.flatten().std())
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                # std over the first batch of all ranks, so that every rank uses the same scale_factor
+                z = z.flatten().double()
+                stats = torch.stack([z.new_tensor(float(z.numel())), z.sum(), (z ** 2).sum()])
+                torch.distributed.all_reduce(stats)
+                n, z_sum, z_sq_sum = stats
+                std = ((z_sq_sum - z_sum ** 2 / n) / (n - 1)).sqrt()
+            else:
+                std = z.flatten().std()
+            self.scale_factor.copy_(1. / std)
             print(f"setting self.scale_factor to {self.scale_factor}")
             print("### USING STD-RESCALING ###")
 
